@@ -7,6 +7,7 @@ import JWT
 public func configure(_ app: Application) async throws {
     
     app.http.server.configuration.hostname = "0.0.0.0"
+    
 
     // uncomment to serve files from /Public folder
     // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
@@ -31,6 +32,7 @@ public func configure(_ app: Application) async throws {
     
     // Register controllers
     try app.register(collection: UserController())
+    try app.register(collection: RouteController())
     
     // JWT algorithms
     // Add HMAC with SHA-256 signer.
