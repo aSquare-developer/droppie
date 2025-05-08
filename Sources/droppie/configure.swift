@@ -7,11 +7,7 @@ import JWT
 public func configure(_ app: Application) async throws {
     
     app.http.server.configuration.hostname = "0.0.0.0"
-    
-
-    // uncomment to serve files from /Public folder
-    // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
-    
+        
     // Make connection to our database
     app.databases.use(
         .postgres(
@@ -29,6 +25,7 @@ public func configure(_ app: Application) async throws {
     // Register migrations
     app.migrations.add(CreateUsersTableMigration())
     app.migrations.add(CreateRoutesTableMigration())
+    app.migrations.add(CreateRoutesListTableMigration())
     
     // Register controllers
     try app.register(collection: UserController())
