@@ -40,7 +40,7 @@ class UserController: RouteCollection {
         return try await LoginResponseDTO(error: false, token: req.jwt.sign(authPayload), userId: existingUser.requireID())
     }
     
-    
+
     func register(req: Request) async throws -> RegisterResponseDTO {
         
         // 1. Validate the user

@@ -8,6 +8,7 @@ struct CreateUsersTableMigration: AsyncMigration {
             .id()
             .field("username", .string, .required).unique(on: "username")
             .field("password", .string, .required)
+            .field("created_at", .datetime)
             .create()
     }
     

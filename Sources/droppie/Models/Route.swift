@@ -5,8 +5,8 @@ final class Route: Model, Content, @unchecked Sendable {
     
     static let schema = "routes"
     
-    @ID(custom: "id", generatedBy: .database)
-    var id: Int?
+    @ID(key: .id)
+    var id: UUID?
     
     @Parent(key: "user_id")
     var user: User
@@ -25,7 +25,7 @@ final class Route: Model, Content, @unchecked Sendable {
     
     init() { }
     
-    init(id: Int? = nil, userID: UUID, origin: String, destination: String, date: Date) {
+    init(id: UUID? = nil, userID: UUID, origin: String, destination: String, date: Date) {
         self.id = id
         self.$user.id = userID
         self.origin = origin
@@ -33,6 +33,18 @@ final class Route: Model, Content, @unchecked Sendable {
         self.date = date
     }
     
+    // MARK: - Create Route
+    static func createRoute(from dto: RouteRequestDTO, userId: UUID, db: any Database) async throws {
+        let route = Route(
+            userID: userId,
+            origin: dto.origin,
+            destination: dto.destination,
+            date: dto.date
+        )
+        try await route.save(on: db)
+    }
+    
+    // MARK: - Get Last Destination
     static func getLastDestination(for userID: UUID, on db: any Database) async throws -> String? {
         try await Route.query(on: db)
             .filter(\.$user.$id == userID)
@@ -41,6 +53,22 @@ final class Route: Model, Content, @unchecked Sendable {
             .map { $0.destination }
     }
     
-
+    // MARK: - Save Intermediate Route
+    static func saveIntermediateRoute(userId: UUID, distance: Double, intermediateRoute: Route, db: any Database) async throws {
+        let speedometerEnd = try await RouteList.getLastSpeedometerEnd(for: userId, on: db)
+        
+        let newRoute = RouteList(
+            userID: userId,
+            origin: intermediateRoute.origin,
+            destination: intermediateRoute.destination,
+            description: "Marsruut restorani",
+            speedometerStart: speedometerEnd,
+            speedometerEnd: speedometerEnd + distance / 1000.0,
+            distance: distance,
+            date: intermediateRoute.date
+        )
+        
+        try await newRoute.save(on: db)
+    }
     
 }

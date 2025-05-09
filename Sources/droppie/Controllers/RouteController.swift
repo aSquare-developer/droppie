@@ -4,7 +4,7 @@ import Fluent
 
 class RouteController: RouteCollection {
     
-    let speedometerStart = 276210
+    let speedometerStart: Double = 276210.0
     private var intermediateRoute = true
     
     func boot(routes: any RoutesBuilder) throws {
@@ -18,17 +18,18 @@ class RouteController: RouteCollection {
     
     func create(req: Request) async throws -> RouteResponseDTO {
         
-        // Validate query
-        try RouteRequestDTO.validate(content: req)
+        // 1. DTO for the request
+        let routeRequestDTO = try req.content.decode(RouteRequestDTO.self)
         
-        // Get the userId
+        // 2. Get the userId
         guard let userId = req.parameters.get("userId", as: UUID.self) else {
             throw Abort(.unauthorized)
         }
         
-        // DTO for the request
-        let routeRequestDTO = try req.content.decode(RouteRequestDTO.self)
+        // 3. Validate query
+        try RouteRequestDTO.validate(content: req)
         
+        // 4. Initializing a Google Service Object
         let googleService = GoogleRoutesService(client: req.client, apiKey: Constants.googleAPIKey)
         
         // TODO: Нужна проверка, есть ли у пользователя последняя поездка. например пользователь новый.
@@ -38,7 +39,6 @@ class RouteController: RouteCollection {
             intermediateRoute = false
         }
         
-                
         // Create intermediate route
         if intermediateRoute {
 
@@ -68,8 +68,8 @@ class RouteController: RouteCollection {
                     destination: intermediateRoute.destination,
                     description: "Marsruut restorani",
                     speedometerStart: speedometerEnd,
-                    speedometerEnd: speedometerEnd + Int(distance) / 1000,
-                    distance: distance,
+                    speedometerEnd: speedometerEnd + Double(distance) / 1000,
+                    distance: Double(distance),
                     date: intermediateRoute.date
                 )
                 
@@ -104,8 +104,8 @@ class RouteController: RouteCollection {
                     destination: routeRequestDTO.destination,
                     description: "Tellimuse kohaletoimetamine kliendile",
                     speedometerStart: speedometerStart,
-                    speedometerEnd: speedometerStart + Int(distance) / 1000,
-                    distance: distance,
+                    speedometerEnd: speedometerStart + Double(distance) / 1000,
+                    distance: Double(distance),
                     date: routeRequestDTO.date
                 )
                 
@@ -117,8 +117,8 @@ class RouteController: RouteCollection {
                     destination: routeRequestDTO.destination,
                     description: "Tellimuse kohaletoimetamine kliendile",
                     speedometerStart: speedometerEnd,
-                    speedometerEnd: speedometerEnd + Int(distance) / 1000,
-                    distance: distance,
+                    speedometerEnd: speedometerEnd + Double(distance) / 1000,
+                    distance: Double(distance),
                     date: routeRequestDTO.date
                 )
                 

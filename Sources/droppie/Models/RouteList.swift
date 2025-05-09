@@ -1,17 +1,12 @@
-import Foundation
 import Fluent
 import Vapor
-
-enum RouteError: Error {
-    case noRouteFound
-}
 
 final class RouteList: Model, Content, @unchecked Sendable {
     
     static let schema = "routes_list"
     
-    @ID(custom: "id", generatedBy: .database)
-    var id: Int?
+    @ID(key: .id)
+    var id: UUID?
     
     @Parent(key: "user_id")
     var user: User
@@ -26,13 +21,13 @@ final class RouteList: Model, Content, @unchecked Sendable {
     var description: String
     
     @Field(key: "speedometer_start")
-    var speedometerStart: Int
+    var speedometerStart: Double
     
     @Field(key: "speedometer_end")
-    var speedometerEnd: Int
+    var speedometerEnd: Double
     
     @Field(key: "distance")
-    var distance: Int
+    var distance: Double
     
     @Field(key: "date")
     var date: Date
@@ -44,8 +39,8 @@ final class RouteList: Model, Content, @unchecked Sendable {
     var updatedAt: Date?
     
     init() { }
-    
-    init(id: Int? = nil, userID: UUID, origin: String, destination: String, description: String, speedometerStart: Int, speedometerEnd: Int, distance: Int, date: Date) {
+
+    init(id: UUID? = nil, userID: UUID, origin: String, destination: String, description: String, speedometerStart: Double, speedometerEnd: Double, distance: Double, date: Date) {
         self.id = id
         self.$user.id = userID
         self.origin = origin
@@ -57,7 +52,7 @@ final class RouteList: Model, Content, @unchecked Sendable {
         self.date = date
     }
     
-    static func getLastSpeedometerEnd(for userID: UUID, on db: any Database) async throws -> Int {
+    static func getLastSpeedometerEnd(for userID: UUID, on db: any Database) async throws -> Double {
         guard let route = try await RouteList.query(on: db)
             .filter(\.$user.$id == userID)
             .sort(\.$id, .descending)

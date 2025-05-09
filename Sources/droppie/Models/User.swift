@@ -2,7 +2,7 @@ import Foundation
 import Fluent
 import Vapor
 
-final class User: Model, Content, Validatable, @unchecked Sendable {
+final class User: Model, @unchecked Sendable {
     
     static let schema = "users"
     
@@ -15,6 +15,9 @@ final class User: Model, Content, Validatable, @unchecked Sendable {
     @Field(key: "password")
     var password: String
     
+    @Timestamp(key: "created_at", on: .create)
+    var createdAt: Date?
+    
     init() {}
     
     init(id: UUID? = nil, username: String, password: String) {
@@ -22,7 +25,11 @@ final class User: Model, Content, Validatable, @unchecked Sendable {
         self.username = username
         self.password = password
     }
-    
+}
+
+extension User: Content { }
+
+extension User: Validatable {
     static func validations(_ validations: inout Validations) {
         validations.add("username", as: String.self, is: !.empty, customFailureDescription: "Username cannot be empty.")
         validations.add("password", as: String.self, is: !.empty, customFailureDescription: "Password cannot be empty.")
@@ -30,5 +37,4 @@ final class User: Model, Content, Validatable, @unchecked Sendable {
         // Password must be between 6 and 10 characters
         validations.add("password", as: String.self, is: .count(6...10), customFailureDescription: "Password must be between 6 and 10 characters long.")
     }
-    
 }
