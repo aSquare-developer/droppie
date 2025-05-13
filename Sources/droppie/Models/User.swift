@@ -38,3 +38,5 @@ extension User: Validatable {
         validations.add("password", as: String.self, is: .count(6...10), customFailureDescription: "Password must be between 6 and 10 characters long.")
     }
 }
+
+extension User: Authenticatable { }

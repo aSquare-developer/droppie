@@ -8,12 +8,34 @@ class RouteController: RouteCollection {
     private var intermediateRoute = true
     
     func boot(routes: any RoutesBuilder) throws {
-        // /api/users/:userId
-        let api = routes.grouped("api", "users", ":userId")
+        // /api/users/
+        let api = routes.grouped("api", "users").grouped(JSONWebTokenAuthenticator())
+        
+        // GET: Get Routes
+        // /api/users/routes
+        api.get("routes", use: index)
         
         // POST: Saving Route
-        // /api/users/:userId/route
+        // /api/users/route
         api.post("route", use: create)
+    }
+    
+    func index(req: Request) async throws -> [RouteList] {
+        
+        let user = try req.auth.require(User.self)
+        
+        guard let userId = user.id else {
+            throw Abort(.unauthorized)
+        }
+        
+        do {
+            let routes = try await RouteList.getAllRoutes(for: userId, on: req.db)
+            return routes
+        } catch {
+            req.logger.error("Error fetching routes for user \(userId): \(error.localizedDescription)")
+            throw Abort(.internalServerError, reason: "Unable to fetch routes")
+        }
+        
     }
     
     func create(req: Request) async throws -> RouteResponseDTO {
@@ -21,8 +43,12 @@ class RouteController: RouteCollection {
         // 1. DTO for the request
         let routeRequestDTO = try req.content.decode(RouteRequestDTO.self)
         
+        // TODO: Add Redis functionality.
+        
         // 2. Get the userId
-        guard let userId = req.parameters.get("userId", as: UUID.self) else {
+        let user = try req.auth.require(User.self)
+        
+        guard let userId = user.id else {
             throw Abort(.unauthorized)
         }
         
@@ -129,9 +155,5 @@ class RouteController: RouteCollection {
         return RouteResponseDTO(error: false)
         
     }
-    
-    func createIntermediateRoute(_ req: Request) {
-        // TODO: Get that value from User Profile
-    }
-    
+
 }

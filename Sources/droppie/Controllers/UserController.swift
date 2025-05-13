@@ -34,13 +34,12 @@ class UserController: RouteCollection {
         }
         
         // 5. Generating the token
-        let authPayload = try AuthPayload(expiration: .init(value: .distantFuture), userId: existingUser.requireID())
+        let authPayload = try AuthPayload(expiration: .init(value: .distantFuture), userId: existingUser.requireID().uuidString)
         
         // 6. Returning successful data to the client
         return try await LoginResponseDTO(error: false, token: req.jwt.sign(authPayload), userId: existingUser.requireID())
     }
     
-
     func register(req: Request) async throws -> RegisterResponseDTO {
         
         // 1. Validate the user

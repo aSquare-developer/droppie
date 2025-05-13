@@ -11,7 +11,7 @@ struct AuthPayload: JWTPayload {
     }
     
     var expiration: ExpirationClaim // Срок действия токена
-    var userId: UUID
+    var userId: String
     
     func verify(using algorithm: some JWTAlgorithm) async throws {
         try self.expiration.verifyNotExpired() // Проверка токена на срок годности :)

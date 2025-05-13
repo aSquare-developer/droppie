@@ -64,4 +64,10 @@ final class RouteList: Model, Content, @unchecked Sendable {
 
         return route.speedometerEnd
     }
+    
+    static func getAllRoutes(for userID: UUID, on db: any Database) async throws -> [RouteList] {
+        try await RouteList.query(on: db)
+            .filter(\.$user.$id == userID)
+            .all()
+    }
 }
