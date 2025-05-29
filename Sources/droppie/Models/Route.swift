@@ -71,4 +71,12 @@ final class Route: Model, Content, @unchecked Sendable {
         try await newRoute.save(on: db)
     }
     
+    static func getAllRoutes(for userID: UUID, on db: any Database) async throws -> [Route] {
+        try await Route.query(on: db)
+            .filter(\.$user.$id == userID)
+            .sort(\.$createdAt, .descending)
+            .limit(20)
+            .all()
+    }
+    
 }

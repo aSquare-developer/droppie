@@ -1,4 +1,3 @@
-import Foundation
 import Vapor
 
 struct RouteResponseDTO: Codable, Content {
