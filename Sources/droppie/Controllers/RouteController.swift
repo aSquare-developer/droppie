@@ -1,9 +1,9 @@
 import Vapor
 import Fluent
 
-class RouteController: RouteCollection {
+actor RouteController: RouteCollection {
         
-    func boot(routes: any RoutesBuilder) throws {
+    nonisolated func boot(routes: any RoutesBuilder) throws {
         // /api/users/
         let api = routes.grouped("api", "users").grouped(JSONWebTokenAuthenticator())
         

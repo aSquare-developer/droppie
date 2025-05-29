@@ -2,9 +2,9 @@ import Foundation
 import Vapor
 import Fluent
 
-class UserController: RouteCollection {
+actor UserController: RouteCollection {
     
-    func boot(routes: any RoutesBuilder) throws {
+    nonisolated func boot(routes: any RoutesBuilder) throws {
         let api = routes.grouped("api")
         
         // /api/register
