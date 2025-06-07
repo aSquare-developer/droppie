@@ -6,7 +6,7 @@ import JWT
 // configures your application
 public func configure(_ app: Application) async throws {
     
-    app.http.server.configuration.hostname = "0.0.0.0"
+//    app.http.server.configuration.hostname = "0.0.0.0"
         
     // Make connection to our database
     app.databases.use(
