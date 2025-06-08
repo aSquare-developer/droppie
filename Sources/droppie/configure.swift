@@ -12,10 +12,10 @@ public func configure(_ app: Application) async throws {
     app.databases.use(
         .postgres(
             configuration: .init(
-                hostname: "localhost",
-                username: "droppie",
-                password: "test123",
-                database: "droppie",
+                hostname: Environment.get("DB_HOST_NAME") ?? "",
+                username: Environment.get("DB_USER_NAME") ?? "",
+                password: Environment.get("DB_PASSWORD") ?? "",
+                database: Environment.get("DB_NAME") ?? "",
                 tls: .disable
             )
         ),
@@ -34,7 +34,13 @@ public func configure(_ app: Application) async throws {
     
     // JWT algorithms
     // Add HMAC with SHA-256 signer.
-    await app.jwt.keys.add(hmac: "secret", digestAlgorithm: .sha256)
+    
+    guard let jwtSecret = Environment.get("JWT_SECRET"),
+          let secretData = jwtSecret.data(using: .utf8) else {
+        fatalError("JWT_SECRET is missing or invalid")
+    }
+
+    await app.jwt.keys.add(hmac: .init(from: secretData), digestAlgorithm: .sha256)
 
     // register routes
     try routes(app)
