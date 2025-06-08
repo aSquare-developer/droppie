@@ -7,20 +7,25 @@ import JWT
 public func configure(_ app: Application) async throws {
     
 //    app.http.server.configuration.hostname = "0.0.0.0"
-        
-    // Make connection to our database
-    app.databases.use(
-        .postgres(
-            configuration: .init(
-                hostname: Environment.get("DB_HOST_NAME") ?? "",
-                username: Environment.get("DB_USER_NAME") ?? "",
-                password: Environment.get("DB_PASSWORD") ?? "",
-                database: Environment.get("DB_NAME") ?? "",
-                tls: .disable
-            )
-        ),
-        as: .psql
-    )
+    
+    if let databaseURL = Environment.get("DATABASE_URL"), var postgresConfig = PostgresConfiguration(url: databaseURL) {
+        postgresConfig.tlsConfiguration = .makeClientConfiguration()
+        postgresConfig.tlsConfiguration?.certificateVerification = .none
+        app.databases.use(.postgres(configuration: postgresConfig), as: .psql)
+    } else {
+        app.databases.use(
+            .postgres(
+                configuration: .init(
+                    hostname: Environment.get("DB_HOST_NAME") ?? "",
+                    username: Environment.get("DB_USER_NAME") ?? "",
+                    password: Environment.get("DB_PASSWORD") ?? "",
+                    database: Environment.get("DB_NAME") ?? "",
+                    tls: .disable
+                )
+            ),
+            as: .psql
+        )
+    }
     
     // Register migrations
     app.migrations.add(CreateUsersTableMigration())
