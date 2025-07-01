@@ -12,6 +12,7 @@ public func configure(_ app: Application) async throws {
             do {
                 var tls = TLSConfiguration.makeClientConfiguration()
                 tls.certificateVerification = .none
+                let nioSSLContext = try NIOSSLContext(configuration: tls)
                 
                 var postgresConfig = try SQLPostgresConfiguration(url: databaseURL)
                 postgresConfig = SQLPostgresConfiguration(
@@ -20,7 +21,7 @@ public func configure(_ app: Application) async throws {
                     username: postgresConfig.coreConfiguration.username,
                     password: postgresConfig.coreConfiguration.password,
                     database: postgresConfig.coreConfiguration.database,
-                    tls: .disable
+                    tls: .require(nioSSLContext)
                 )
 
                 app.databases.use(.postgres(configuration: postgresConfig), as: .psql)
