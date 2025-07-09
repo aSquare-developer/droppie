@@ -1,8 +1,11 @@
-//
-//  File.swift
-//  droppie
-//
-//  Created by Artur Anissimov on 09.07.2025.
-//
-
 import Foundation
+
+extension String {
+    func normalizedRouteComponent() -> String {
+        self
+            .lowercased()
+            .components(separatedBy: .whitespacesAndNewlines)
+            .joined()
+            .replacingOccurrences(of: ",", with: "")
+    }
+}

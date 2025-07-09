@@ -20,17 +20,21 @@ final class Route: Model, Content, @unchecked Sendable {
     @Field(key: "date")
     var date: Date
     
+    @Field(key: "distance")
+    var distance: Double?
+    
     @Timestamp(key: "created_at", on: .create)
     var createdAt: Date?
     
     init() { }
     
-    init(id: UUID? = nil, userID: UUID, origin: String, destination: String, date: Date) {
+    init(id: UUID? = nil, userID: UUID, origin: String, destination: String, date: Date, distance: Double? = nil) {
         self.id = id
         self.$user.id = userID
         self.origin = origin
         self.destination = destination
         self.date = date
+        self.distance = distance
     }
     
     // MARK: - Create Route
@@ -71,12 +75,20 @@ final class Route: Model, Content, @unchecked Sendable {
         try await newRoute.save(on: db)
     }
     
+    // MARK: - Get All Routes from database by user id
     static func getAllRoutes(for userID: UUID, on db: any Database) async throws -> [Route] {
         try await Route.query(on: db)
             .filter(\.$user.$id == userID)
             .sort(\.$createdAt, .descending)
             .limit(20)
             .all()
+    }
+    
+    // MARK: - Get Unique key from origin and destination
+    static func generateRouteKey(from dto: RouteRequestDTO) -> String {
+        let origin = dto.origin.normalizedRouteComponent()
+        let destination = dto.destination.normalizedRouteComponent()
+        return "\(origin)-\(destination)"
     }
     
 }

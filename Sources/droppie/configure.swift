@@ -2,45 +2,62 @@ import Vapor
 import Fluent
 import FluentPostgresDriver
 import JWT
+import Redis
 
 // configures your application
 public func configure(_ app: Application) async throws {
     
-//    app.http.server.configuration.hostname = "0.0.0.0"
+    // Settings for working in a local environment
+    app.http.server.configuration.hostname = "0.0.0.0"
     
-    if let databaseURL = Environment.get("DATABASE_URL") {
-            do {
-                var tls = TLSConfiguration.makeClientConfiguration()
-                tls.certificateVerification = .none
-                let nioSSLContext = try NIOSSLContext(configuration: tls)
-                
-                var postgresConfig = try SQLPostgresConfiguration(url: databaseURL)
-                postgresConfig = SQLPostgresConfiguration(
-                    hostname: postgresConfig.coreConfiguration.host ?? "",
-                    port: postgresConfig.coreConfiguration.port ?? 5432,
-                    username: postgresConfig.coreConfiguration.username,
-                    password: postgresConfig.coreConfiguration.password,
-                    database: postgresConfig.coreConfiguration.database,
-                    tls: .require(nioSSLContext)
-                )
-
-                app.databases.use(.postgres(configuration: postgresConfig), as: .psql)
-            } catch {
-                app.logger.report(error: error)
-                fatalError("Invalid DATABASE_URL: \(error)")
-            }
-        } else {
-            let config = SQLPostgresConfiguration(
-                hostname: Environment.get("DB_HOST_NAME") ?? "",
-                port: 5432,
-                username: Environment.get("DB_USER_NAME") ?? "",
-                password: Environment.get("DB_PASSWORD") ?? "",
-                database: Environment.get("DB_NAME") ?? "",
+    app.databases.use(
+        .postgres(
+            configuration: .init(
+                hostname: "localhost",
+                username: "droppie",
+                password: "test123",
+                database: "droppie",
                 tls: .disable
             )
-
-            app.databases.use(.postgres(configuration: config), as: .psql)
-        }
+        ),
+        as: .psql
+    )
+    
+//    if let databaseURL = Environment.get("DATABASE_URL") {
+//        do {
+//            var tls = TLSConfiguration.makeClientConfiguration()
+//            tls.certificateVerification = .none
+//            let nioSSLContext = try NIOSSLContext(configuration: tls)
+//            
+//            var postgresConfig = try SQLPostgresConfiguration(url: databaseURL)
+//            postgresConfig = SQLPostgresConfiguration(
+//                hostname: postgresConfig.coreConfiguration.host ?? "",
+//                port: postgresConfig.coreConfiguration.port ?? 5432,
+//                username: postgresConfig.coreConfiguration.username,
+//                password: postgresConfig.coreConfiguration.password,
+//                database: postgresConfig.coreConfiguration.database,
+//                tls: .require(nioSSLContext)
+//            )
+//
+//            app.databases.use(.postgres(configuration: postgresConfig), as: .psql)
+//        } catch {
+//            app.logger.report(error: error)
+//            fatalError("Invalid DATABASE_URL: \(error)")
+//        }
+//    } else {
+//        let config = SQLPostgresConfiguration(
+//            hostname: Environment.get("DB_HOST_NAME") ?? "",
+//            port: 5432,
+//            username: Environment.get("DB_USER_NAME") ?? "",
+//            password: Environment.get("DB_PASSWORD") ?? "",
+//            database: Environment.get("DB_NAME") ?? "",
+//            tls: .disable
+//        )
+//
+//        app.databases.use(.postgres(configuration: config), as: .psql)
+//    }
+    
+    app.redis.configuration = try RedisConfiguration(hostname: "localhost", port: 6379)
 
     
     // Register migrations
