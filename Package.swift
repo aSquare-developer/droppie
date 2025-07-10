@@ -18,7 +18,9 @@ let package = Package(
         // JWT
         .package(url: "https://github.com/vapor/jwt.git", from: "5.0.0"),
         // Redis
-        .package(url: "https://github.com/vapor/redis.git", from: "4.5.0")
+        .package(url: "https://github.com/vapor/redis.git", from: "4.5.0"),
+        // Queues Redis Driver
+        .package(url: "https://github.com/vapor/queues-redis-driver.git", from: "1.0.0")
 
     ],
     targets: [
@@ -31,7 +33,8 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "JWT", package: "jwt"),
-                .product(name: "Redis", package: "redis")
+                .product(name: "Redis", package: "redis"),
+                .product(name: "QueuesRedisDriver", package: "queues-redis-driver")
             ],
             swiftSettings: swiftSettings
         ),

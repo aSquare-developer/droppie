@@ -37,6 +37,15 @@ final class Route: Model, Content, @unchecked Sendable {
         self.distance = distance
     }
     
+    // MARK: - Find Route
+    static func find(matching dto: RouteRequestDTO, on db: any Database) async throws -> Route? {
+        return try await Route.query(on: db)
+            .filter(\.$origin == dto.origin)
+            .filter(\.$destination == dto.destination)
+            .filter(\.$date == dto.date)
+            .first()
+    }
+    
     // MARK: - Create Route
     static func createRoute(from dto: RouteRequestDTO, userId: UUID, db: any Database) async throws {
         let route = Route(

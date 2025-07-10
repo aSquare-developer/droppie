@@ -3,6 +3,7 @@ import Fluent
 import FluentPostgresDriver
 import JWT
 import Redis
+import QueuesRedisDriver
 
 // configures your application
 public func configure(_ app: Application) async throws {
@@ -22,6 +23,10 @@ public func configure(_ app: Application) async throws {
         ),
         as: .psql
     )
+    
+    app.redis.configuration = try RedisConfiguration(hostname: "localhost", port: 6379)
+    
+    try app.queues.use(.redis(url: "redis://127.0.0.1:6379"))
     
 //    if let databaseURL = Environment.get("DATABASE_URL") {
 //        do {
@@ -57,7 +62,7 @@ public func configure(_ app: Application) async throws {
 //        app.databases.use(.postgres(configuration: config), as: .psql)
 //    }
     
-    app.redis.configuration = try RedisConfiguration(hostname: "localhost", port: 6379)
+//    app.redis.configuration = try RedisConfiguration(hostname: "localhost", port: 6379)
 
     
     // Register migrations
