@@ -24,9 +24,23 @@ public func configure(_ app: Application) async throws {
         as: .psql
     )
     
-    app.redis.configuration = try RedisConfiguration(hostname: "localhost", port: 6379)
+    let redisConfig = try RedisConfiguration(
+        hostname: "localhost",
+        port: 6379,
+        pool: RedisConfiguration.PoolOptions(
+            maximumConnectionCount: RedisConnectionPoolSize.maximumActiveConnections(30),
+            minimumConnectionCount: 5
+        )
+    )
     
-    try app.queues.use(.redis(url: "redis://127.0.0.1:6379"))
+    app.redis.configuration = redisConfig
+    
+    app.queues.use(.redis(redisConfig))
+    
+    let routeJob = RouteDistanceJob()
+    app.queues.add(routeJob)
+    
+    try app.queues.startInProcessJobs(on: .default)
     
 //    if let databaseURL = Environment.get("DATABASE_URL") {
 //        do {

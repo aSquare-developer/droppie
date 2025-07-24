@@ -21,14 +21,14 @@ final class Route: Model, Content, @unchecked Sendable {
     var date: Date
     
     @Field(key: "distance")
-    var distance: Double?
+    var distance: Float?
     
     @Timestamp(key: "created_at", on: .create)
     var createdAt: Date?
     
     init() { }
     
-    init(id: UUID? = nil, userID: UUID, origin: String, destination: String, date: Date, distance: Double? = nil) {
+    init(id: UUID? = nil, userID: UUID, origin: String, destination: String, date: Date, distance: Float? = nil) {
         self.id = id
         self.$user.id = userID
         self.origin = origin
@@ -38,12 +38,21 @@ final class Route: Model, Content, @unchecked Sendable {
     }
     
     // MARK: - Find Route
-    static func find(matching dto: RouteRequestDTO, on db: any Database) async throws -> Route? {
-        return try await Route.query(on: db)
-            .filter(\.$origin == dto.origin)
-            .filter(\.$destination == dto.destination)
-            .filter(\.$date == dto.date)
-            .first()
+    static func find(object: Route, on db: any Database) async throws -> Route {
+        guard let id = object.id else {
+            throw Abort(.badRequest, reason: "Route ID is missing.")
+        }
+
+        guard let route = try await Route.query(on: db)
+            .filter(\.$id == id)
+            .filter(\.$origin == object.origin)
+            .filter(\.$destination == object.destination)
+            .filter(\.$date == object.date)
+            .first() else {
+                throw Abort(.notFound, reason: "Route not found.")
+            }
+
+        return route
     }
     
     // MARK: - Create Route
@@ -94,7 +103,7 @@ final class Route: Model, Content, @unchecked Sendable {
     }
     
     // MARK: - Get Unique key from origin and destination
-    static func generateRouteKey(from dto: RouteRequestDTO) -> String {
+    static func generateRouteKey(from dto: Route) -> String {
         let origin = dto.origin.normalizedRouteComponent()
         let destination = dto.destination.normalizedRouteComponent()
         return "\(origin)-\(destination)"
