@@ -14,6 +14,31 @@ actor RouteController: RouteCollection {
         // POST: Saving Route
         // /api/users/route
         api.post("route", use: create)
+        
+        // TEST
+        api.get("fetch", use: fetchData)
+    }
+    
+    func fetchData(req: Request) async throws -> RouteResponseDTO {
+        let user = try req.auth.require(User.self)
+
+        guard let userId = user.id else {
+            throw Abort(.unauthorized)
+        }
+
+        // Только маршруты без distance
+        let routes = try await Route.query(on: req.db)
+            .filter(\.$user.$id == userId)
+            .filter(\.$distance == nil)
+            .sort(\.$createdAt, .ascending)
+            .all()
+
+        for route in routes {
+            let id = try route.requireID()
+            try await req.queue.dispatch(RouteDistanceJob.self, id)
+        }
+        
+        return RouteResponseDTO(error: false)
     }
     
     func index(req: Request) async throws -> [Route] {
@@ -53,6 +78,11 @@ actor RouteController: RouteCollection {
         
         // 5. Try to save our route into database
         try await route.save(on: req.db)
+        
+        let routeID = try route.requireID()
+        
+        // Redis section
+        try await req.queue.dispatch(RouteDistanceJob.self, routeID)
         
         // Return response to client
         return RouteResponseDTO(error: false)
