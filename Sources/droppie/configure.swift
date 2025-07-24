@@ -42,12 +42,12 @@ public func configure(_ app: Application) async throws {
 //    
 //    try app.queues.startInProcessJobs(on: .default)
     
+    var tls = TLSConfiguration.makeClientConfiguration()
+    tls.certificateVerification = .none
+    let nioSSLContext = try NIOSSLContext(configuration: tls)
+    
     if let databaseURL = Environment.get("DATABASE_URL") {
         do {
-            var tls = TLSConfiguration.makeClientConfiguration()
-            tls.certificateVerification = .none
-            let nioSSLContext = try NIOSSLContext(configuration: tls)
-            
             var postgresConfig = try SQLPostgresConfiguration(url: databaseURL)
             postgresConfig = SQLPostgresConfiguration(
                 hostname: postgresConfig.coreConfiguration.host ?? "",
@@ -79,6 +79,7 @@ public func configure(_ app: Application) async throws {
     if let redisURL = Environment.get("REDIS_URL") {
         let redisConfig = try RedisConfiguration(
             url: redisURL,
+            tlsConfiguration: tls,
             pool: RedisConfiguration.PoolOptions(
                 maximumConnectionCount: RedisConnectionPoolSize.maximumActiveConnections(30),
                 minimumConnectionCount: 5)
