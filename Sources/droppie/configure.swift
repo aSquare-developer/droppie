@@ -79,11 +79,7 @@ public func configure(_ app: Application) async throws {
     if let redisURL = Environment.get("REDIS_URL") {
         let redisConfig = try RedisConfiguration(
             url: redisURL,
-            tlsConfiguration: tls,
-            pool: RedisConfiguration.PoolOptions(
-                maximumConnectionCount: RedisConnectionPoolSize.maximumActiveConnections(30),
-                minimumConnectionCount: 5)
-            )
+            tlsConfiguration: tls)
         
         app.redis.configuration = redisConfig
         app.queues.use(.redis(redisConfig))
