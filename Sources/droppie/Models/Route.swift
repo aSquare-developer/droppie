@@ -75,23 +75,23 @@ final class Route: Model, Content, @unchecked Sendable {
             .map { $0.destination }
     }
     
-    // MARK: - Save Intermediate Route
-    static func saveIntermediateRoute(userId: UUID, distance: Double, intermediateRoute: Route, db: any Database) async throws {
-        let speedometerEnd = try await RouteList.getLastSpeedometerEnd(for: userId, on: db)
-        
-        let newRoute = RouteList(
-            userID: userId,
-            origin: intermediateRoute.origin,
-            destination: intermediateRoute.destination,
-            description: "Marsruut restorani",
-            speedometerStart: speedometerEnd,
-            speedometerEnd: speedometerEnd + distance / 1000.0,
-            distance: distance,
-            date: intermediateRoute.date
-        )
-        
-        try await newRoute.save(on: db)
-    }
+//    // MARK: - Save Intermediate Route
+//    static func saveIntermediateRoute(userId: UUID, distance: Double, intermediateRoute: Route, db: any Database) async throws {
+//        let speedometerEnd = try await RouteList.getLastSpeedometerEnd(for: userId, on: db)
+//        
+//        let newRoute = RouteList(
+//            userID: userId,
+//            origin: intermediateRoute.origin,
+//            destination: intermediateRoute.destination,
+//            description: "Marsruut restorani",
+//            speedometerStart: speedometerEnd,
+//            speedometerEnd: speedometerEnd + distance / 1000.0,
+//            distance: distance,
+//            date: intermediateRoute.date
+//        )
+//        
+//        try await newRoute.save(on: db)
+//    }
     
     // MARK: - Get All Routes from database by user id
     static func getAllRoutes(for userID: UUID, on db: any Database) async throws -> [Route] {
@@ -107,6 +107,26 @@ final class Route: Model, Content, @unchecked Sendable {
         let origin = dto.origin.normalizedRouteComponent()
         let destination = dto.destination.normalizedRouteComponent()
         return "\(origin)-\(destination)"
+    }
+    
+    static func fetchRoutes(forMonth month: Int, year: Int, on db: any Database) async throws -> [Route] {
+        // Создаём календарь, чтобы вычислить границы месяца
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)! // чтобы не было смещения по времени
+
+        // Начало месяца
+        guard let startDate = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
+              let endDate = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startDate)
+        else {
+            throw Abort(.badRequest, reason: "Invalid month or year")
+        }
+
+        // Возвращаем маршруты, попадающие в этот диапазон
+        return try await Route.query(on: db)
+            .filter(\.$date >= startDate)
+            .filter(\.$date <= endDate)
+            .sort(\.$createdAt, .ascending)
+            .all()
     }
     
 }
