@@ -14,7 +14,101 @@ actor RouteController: RouteCollection {
         // POST: Saving Route
         // /api/users/route
         api.post("route", use: create)
+        
+        // Test Function for creating first example
+        api.get("routes", "generate", use: generateRoutes)
+        
+        // GET: Delete Route
+        // /api/users/route/:id
+        api.delete("route", ":id", use: delete)
+        
     }
+    
+    func delete(req: Request) async throws -> RouteResponseDTO {
+        
+        // 1. Get User ID
+        let user = try req.auth.require(User.self)
+        
+        // 2. Get route ID from URL
+        guard let routeID = req.parameters.get("id", as: UUID.self) else {
+            throw Abort(.badRequest)
+        }
+        
+        // 3. Find route
+        guard let route = try await Route.find(routeID, on: req.db) else {
+            throw Abort(.notFound)
+        }
+        
+        // 4. Ensure the route belongs to the user
+        guard route.$user.id == user.id else {
+            throw Abort(.forbidden)
+        }
+        
+        // 5. Delete
+        try await route.delete(on: req.db)
+        
+        return RouteResponseDTO(error: false)
+    }
+    
+    func generateRoutes(request: Request) async throws -> Response {
+        // Пример запроса: /routes/generate?month=2&year=2025&currentOdometer=276743.0
+        guard
+            let month = request.query[Int.self, at: "month"],
+            let year = request.query[Int.self, at: "year"],
+            var currentOdometer = request.query[Double.self, at: "currentOdometer"]
+        else {
+            throw Abort(.badRequest, reason: "Missing month or year")
+        }
+        
+        let data = try await Route.fetchRoutes(forMonth: month, year: year, on: request.db)
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "dd.MM.yyyy"
+
+        var totalDistance = 0.0
+        
+        // Формируем данные для PDF
+        let routesForPDF: [RoutePDFModel] = data.map { route in
+            totalDistance += Double((route.distance ?? 0) / 1000)
+            
+            let description = "\(route.origin) → \(route.destination) (Tellimuse kohaletoimetamine)"
+            let start = currentOdometer
+            let end = start + Double((route.distance ?? 0) / 1000)
+            
+            let pdfRoute = RoutePDFModel(
+                date: dateFormatter.string(from: route.date),
+                description: description,
+                startOdometer: String(format: "%.1f", start),
+                endOdometer: String(format: "%.1f", end),
+                distance: String(format: "%.2f", route.distance! / 1000)
+            )
+            
+            currentOdometer = end
+            
+            return pdfRoute
+        }
+
+        let context: [String: any Encodable] = [
+            "companyName": "aSquare OÜ",
+            "vehicleUser": "Artur Anissimov",
+            "vehicleRegNumber": "981RFD",
+            "period": "Märts 2025",
+            "routes": routesForPDF,
+            "totalDistance": String(format: "%.2f", totalDistance)
+        ]
+
+        let pdfData = try await request.application.pdfService.generate(
+            fromLeaf: "routes", // TODO: Here in future, we can change document template.
+            context: context,
+            using: request
+        )
+
+            var headers = HTTPHeaders()
+            headers.add(name: .contentType, value: "application/pdf")
+            headers.add(name: .contentDisposition, value: "inline; filename=\"routes.pdf\"")
+            return Response(status: .ok, headers: headers, body: .init(data: pdfData))
+    }
+    
     
     func index(req: Request) async throws -> [Route] {
         
@@ -54,8 +148,15 @@ actor RouteController: RouteCollection {
         // 5. Try to save our route into database
         try await route.save(on: req.db)
         
+        let routeID = try route.requireID()
+        
+        // Redis section
+        try await req.queue.dispatch(RouteDistanceJob.self, routeID)
+        
         // Return response to client
         return RouteResponseDTO(error: false)
     }
     
 }
+
+

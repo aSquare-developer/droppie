@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 2em; }
+      table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+      th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+      th { background-color: #f0f0f0; }
+      td.total { font-weight: bold; text-align: right; }
+    </style>
+  </head>
+  <body>
+    <p><strong>#(companyName)</strong></p>
+    <h1 style="text-align:center;">SÕIDUPÄEVIK</h1>
+    <p style="text-align:center;"><strong>#(period)</strong></p>
+    
+    <div style="width:100%; padding-bottom:10px; display:table;">
+      <div style="display:table-row;">
+        <div style="display:table-cell; width:50%; vertical-align:middle;">
+          Sõiduki kasutaja: #(vehicleUser)
+        </div>
+        <div style="display:table-cell; width:50%; vertical-align:middle; text-align:right;">
+          Sõiduki reg. nr: #(vehicleRegNumber)
+        </div>
+      </div>
+    </div>
+
+
+    <table>
+      <tr>
+        <th>Kuupäev</th>
+        <th>Teekond ja sõidu eesmärk</th>
+        <th>sp. algnäit</th>
+        <th>sp. lõppnäit</th>
+        <th>km kokku</th>
+      </tr>
+        #for(route in routes):
+            <tr>
+                <td>#(route.date)</td>
+                <td>#(route.description)</td>
+                <td>#(route.startOdometer)</td>
+                <td>#(route.endOdometer)</td>
+                <td>#(route.distance)km</td>
+            </tr>
+        #endfor
+      <tr>
+        <td colspan="4" class="total">Total:</td>
+        <td class="total">#(totalDistance)km</td>
+      </tr>
+    </table>
+  </body>
+</html>
