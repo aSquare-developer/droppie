@@ -109,7 +109,6 @@ actor RouteController: RouteCollection {
             return Response(status: .ok, headers: headers, body: .init(data: pdfData))
     }
     
-    
     func index(req: Request) async throws -> [Route] {
         
         let user = try req.auth.require(User.self)
