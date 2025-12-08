@@ -18,30 +18,36 @@ actor RouteController: RouteCollection {
         // Test Function for creating first example
         api.get("routes", "generate", use: generateRoutes)
         
-        // Delete route
-        api.delete("routes", ":route_id", use: delete)
+        // GET: Delete Route
+        // /api/users/route/:id
+        api.delete("route", ":id", use: delete)
         
     }
     
-    func delete(request: Request) async throws -> HTTPStatus {
+    func delete(req: Request) async throws -> RouteResponseDTO {
         
-        guard let routeId = request.parameters.get("route_id", as: UUID.self) else {
-                throw Abort(.badRequest, reason: "Missing route ID")
+        // 1. Get User ID
+        let user = try req.auth.require(User.self)
+        
+        // 2. Get route ID from URL
+        guard let routeID = req.parameters.get("id", as: UUID.self) else {
+            throw Abort(.badRequest)
         }
         
-        guard let route = try await Route.find(routeId, on: request.db) else {
-            throw Abort(.notFound, reason: "Route not found")
+        // 3. Find route
+        guard let route = try await Route.find(routeID, on: req.db) else {
+            throw Abort(.notFound)
         }
         
-        let user = try request.auth.require(User.self)
+        // 4. Ensure the route belongs to the user
         guard route.$user.id == user.id else {
-            throw Abort(.forbidden, reason: "Not allowed to delete this route")
+            throw Abort(.forbidden)
         }
         
-        try await route.delete(on: request.db)
+        // 5. Delete
+        try await route.delete(on: req.db)
         
-        return .noContent
-        
+        return RouteResponseDTO(error: false)
     }
     
     func generateRoutes(request: Request) async throws -> Response {
@@ -152,3 +158,5 @@ actor RouteController: RouteCollection {
     }
     
 }
+
+
