@@ -113,7 +113,7 @@ public func configure(_ app: Application) async throws {
     await app.jwt.keys.add(hmac: .init(from: secretData), digestAlgorithm: .sha256)
 
     // register routes
-//    try routes(app)
+    try routes(app)
     
     
     try await app.autoMigrate()
