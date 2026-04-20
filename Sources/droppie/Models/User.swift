@@ -34,8 +34,12 @@ extension User: Validatable {
         validations.add("username", as: String.self, is: !.empty, customFailureDescription: "Username cannot be empty.")
         validations.add("password", as: String.self, is: !.empty, customFailureDescription: "Password cannot be empty.")
         
-        // Password must be between 6 and 10 characters
-        validations.add("password", as: String.self, is: .count(6...10), customFailureDescription: "Password must be between 6 and 10 characters long.")
+        validations.add(
+            "password",
+            as: String.self,
+            is: .count(8...128),
+            customFailureDescription: "Password must be between 8 and 128 characters long."
+        )
     }
 }
 

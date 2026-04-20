@@ -5,10 +5,11 @@ struct CreateProfilesTableMigration: AsyncMigration {
         try await database.schema("profiles")
             .id()
             .field("user_id", .uuid, .required, .references("users", "id", onDelete: .cascade))
-            .field("car_owner", .string)
-            .field("car_model", .string)
-            .field("car_regnumber", .string)
-            .field("vehicle_user", .string)
+            .field("car_owner", .string, .required)
+            .field("car_model", .string, .required)
+            .field("car_regnumber", .string, .required)
+            .field("vehicle_user", .string, .required)
+            .field("created_at", .datetime)
             .create()
     }
     

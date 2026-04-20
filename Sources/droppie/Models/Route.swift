@@ -109,22 +109,23 @@ final class Route: Model, Content, @unchecked Sendable {
         return "\(origin)-\(destination)"
     }
     
-    static func fetchRoutes(forMonth month: Int, year: Int, on db: any Database) async throws -> [Route] {
+    static func fetchRoutes(for userID: UUID, month: Int, year: Int, on db: any Database) async throws -> [Route] {
         // Создаём календарь, чтобы вычислить границы месяца
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)! // чтобы не было смещения по времени
 
         // Начало месяца
         guard let startDate = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
-              let endDate = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startDate)
+              let nextMonthStartDate = calendar.date(byAdding: DateComponents(month: 1), to: startDate)
         else {
             throw Abort(.badRequest, reason: "Invalid month or year")
         }
 
         // Возвращаем маршруты, попадающие в этот диапазон
         return try await Route.query(on: db)
+            .filter(\.$user.$id == userID)
             .filter(\.$date >= startDate)
-            .filter(\.$date <= endDate)
+            .filter(\.$date < nextMonthStartDate)
             .sort(\.$createdAt, .ascending)
             .all()
     }

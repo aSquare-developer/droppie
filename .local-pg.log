@@ -1,0 +1,23 @@
+2026-04-20 16:10:26.363 EEST [69616] LOG:  starting PostgreSQL 14.20 (Homebrew) on aarch64-apple-darwin25.1.0, compiled by Apple clang version 17.0.0 (clang-1700.4.4.1), 64-bit
+2026-04-20 16:10:26.364 EEST [69616] LOG:  listening on IPv6 address "::1", port 54329
+2026-04-20 16:10:26.364 EEST [69616] LOG:  listening on IPv4 address "127.0.0.1", port 54329
+2026-04-20 16:10:26.365 EEST [69616] LOG:  listening on Unix socket "/tmp/.s.PGSQL.54329"
+2026-04-20 16:10:26.367 EEST [69626] LOG:  database system was shut down at 2026-04-20 16:10:17 EEST
+2026-04-20 16:10:26.371 EEST [69616] LOG:  database system is ready to accept connections
+2026-04-20 16:11:32.588 EEST [69616] LOG:  received fast shutdown request
+2026-04-20 16:11:32.589 EEST [69616] LOG:  aborting any active transactions
+2026-04-20 16:11:32.591 EEST [69616] LOG:  background worker "logical replication launcher" (PID 69632) exited with exit code 1
+2026-04-20 16:11:32.592 EEST [69627] LOG:  shutting down
+2026-04-20 16:11:32.601 EEST [69616] LOG:  database system is shut down
+2026-04-20 16:11:40.986 EEST [70190] LOG:  starting PostgreSQL 14.20 (Homebrew) on aarch64-apple-darwin25.1.0, compiled by Apple clang version 17.0.0 (clang-1700.4.4.1), 64-bit
+2026-04-20 16:11:40.988 EEST [70190] LOG:  listening on IPv6 address "::1", port 5432
+2026-04-20 16:11:40.988 EEST [70190] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2026-04-20 16:11:40.988 EEST [70190] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5432"
+2026-04-20 16:11:40.991 EEST [70197] LOG:  database system was shut down at 2026-04-20 16:11:32 EEST
+2026-04-20 16:11:40.994 EEST [70190] LOG:  database system is ready to accept connections
+2026-04-20 16:11:53.773 EEST [70258] FATAL:  role "arturanissimov" does not exist
+2026-04-20 16:33:57.811 EEST [70190] LOG:  received fast shutdown request
+2026-04-20 16:33:57.811 EEST [70190] LOG:  aborting any active transactions
+2026-04-20 16:33:57.813 EEST [70190] LOG:  background worker "logical replication launcher" (PID 70203) exited with exit code 1
+2026-04-20 16:33:57.813 EEST [70198] LOG:  shutting down
+2026-04-20 16:33:57.820 EEST [70190] LOG:  database system is shut down

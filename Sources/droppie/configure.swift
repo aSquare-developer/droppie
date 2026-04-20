@@ -5,116 +5,213 @@ import JWT
 import Redis
 import QueuesRedisDriver
 import Leaf
+import FluentSQL
+
+struct AppConfigurationError: Error, LocalizedError {
+    let message: String
+
+    var errorDescription: String? {
+        message
+    }
+}
 
 // configures your application
 public func configure(_ app: Application) async throws {
-    
     app.views.use(.leaf)
-    
-    // Settings for working in a local environment
-//    app.http.server.configuration.hostname = "0.0.0.0"
-    
-//    app.databases.use(
-//        .postgres(
-//            configuration: .init(
-//                hostname: "127.0.0.1",
-//                username: "droppie",
-//                password: "test123",
-//                database: "droppie",
-//                tls: .disable
-//            )
-//        ),
-//        as: .psql
-//    )
-//    
-//    let redisConfig = try RedisConfiguration(
-//        hostname: "127.0.0.1",
-//        port: 6379,
-//        pool: RedisConfiguration.PoolOptions(
-//            maximumConnectionCount: RedisConnectionPoolSize.maximumActiveConnections(30),
-//            minimumConnectionCount: 5
-//        )
-//    )
-//    
-//    app.redis.configuration = redisConfig
-//    
-//    app.queues.use(.redis(redisConfig))
-//    
-//    let routeJob = RouteDistanceJob()
-//    app.queues.add(routeJob)
-    
-//    try app.queues.startInProcessJobs(on: .default)
-    
-    var tls = TLSConfiguration.makeClientConfiguration()
-    tls.certificateVerification = .none
-    let nioSSLContext = try NIOSSLContext(configuration: tls)
-    
+
+    let jwtSecret = try requireEnvironment("JWT_SECRET")
+    let jwtSecretData = try data(for: jwtSecret, variableName: "JWT_SECRET")
+    let googleRoutesAPIKey = Environment.get("GOOGLE_ROUTES_API_KEY")
+    let jwtLifetime = max(doubleEnvironment("JWT_ACCESS_TOKEN_LIFETIME_SECONDS") ?? 86_400, 300)
+    let autoMigrateOnStartup = boolEnvironment("AUTO_MIGRATE") ?? false
+    let authRateLimitMaxAttempts = max(intEnvironment("AUTH_RATE_LIMIT_MAX_ATTEMPTS") ?? 10, 1)
+    let authRateLimitWindow = max(doubleEnvironment("AUTH_RATE_LIMIT_WINDOW_SECONDS") ?? 60, 1)
+    let authRateLimitBlockDuration = max(doubleEnvironment("AUTH_RATE_LIMIT_BLOCK_DURATION_SECONDS") ?? 900, 1)
+    let corsAllowedOrigins = csvEnvironment("CORS_ALLOWED_ORIGINS")
+    let enableHSTS = boolEnvironment("ENABLE_HSTS") ?? (app.environment == .production)
+
+    app.appConfiguration = .init(
+        googleRoutesAPIKey: googleRoutesAPIKey,
+        queueProcessingEnabled: false,
+        autoMigrateOnStartup: autoMigrateOnStartup,
+        jwtAccessTokenLifetime: jwtLifetime,
+        authRateLimitMaxAttempts: authRateLimitMaxAttempts,
+        authRateLimitWindow: authRateLimitWindow,
+        authRateLimitBlockDuration: authRateLimitBlockDuration,
+        corsAllowedOrigins: corsAllowedOrigins,
+        enableHSTS: enableHSTS
+    )
+
+    try configureMiddleware(app)
+
     if let databaseURL = Environment.get("DATABASE_URL") {
         do {
-            var postgresConfig = try SQLPostgresConfiguration(url: databaseURL)
-            postgresConfig = SQLPostgresConfiguration(
-                hostname: postgresConfig.coreConfiguration.host ?? "",
-                port: postgresConfig.coreConfiguration.port ?? 5432,
-                username: postgresConfig.coreConfiguration.username,
-                password: postgresConfig.coreConfiguration.password,
-                database: postgresConfig.coreConfiguration.database,
-                tls: .require(nioSSLContext)
-            )
-
+            let postgresConfig = try SQLPostgresConfiguration(url: databaseURL)
             app.databases.use(.postgres(configuration: postgresConfig), as: .psql)
         } catch {
             app.logger.report(error: error)
-            fatalError("Invalid DATABASE_URL: \(error)")
+            throw AppConfigurationError(message: "Invalid DATABASE_URL: \(error.localizedDescription)")
         }
     } else {
+        let shouldUseDatabaseTLS = boolEnvironment("DB_TLS") ?? false
         let config = SQLPostgresConfiguration(
-            hostname: Environment.get("DB_HOST_NAME") ?? "",
+            hostname: try requireEnvironment("DB_HOST_NAME"),
             port: 5432,
-            username: Environment.get("DB_USER_NAME") ?? "",
-            password: Environment.get("DB_PASSWORD") ?? "",
-            database: Environment.get("DB_NAME") ?? "",
-            tls: .disable
+            username: try requireEnvironment("DB_USER_NAME"),
+            password: try requireEnvironment("DB_PASSWORD"),
+            database: try requireEnvironment("DB_NAME"),
+            tls: shouldUseDatabaseTLS ? .prefer(try NIOSSLContext(configuration: TLSConfiguration.makeClientConfiguration())) : .disable
         )
 
         app.databases.use(.postgres(configuration: config), as: .psql)
     }
-    
+
     if let redisURL = Environment.get("REDIS_URL") {
-        let redisConfig = try RedisConfiguration(
-            url: redisURL,
-            tlsConfiguration: tls)
-        
-        app.redis.configuration = redisConfig
-        app.queues.use(.redis(redisConfig))
-        
-        let routeJob = RouteDistanceJob()
-        app.queues.add(routeJob)
-        
-        try app.queues.startInProcessJobs(on: .default)
+        do {
+            let redisConfig = try redisConfiguration(from: redisURL)
+            app.redis.configuration = redisConfig
+            app.queues.use(.redis(redisConfig))
+
+            let routeJob = RouteDistanceJob()
+            app.queues.add(routeJob)
+            try app.queues.startInProcessJobs(on: .default)
+
+            app.appConfiguration = .init(
+                googleRoutesAPIKey: googleRoutesAPIKey,
+                queueProcessingEnabled: googleRoutesAPIKey != nil,
+                autoMigrateOnStartup: autoMigrateOnStartup,
+                jwtAccessTokenLifetime: jwtLifetime,
+                authRateLimitMaxAttempts: authRateLimitMaxAttempts,
+                authRateLimitWindow: authRateLimitWindow,
+                authRateLimitBlockDuration: authRateLimitBlockDuration,
+                corsAllowedOrigins: corsAllowedOrigins,
+                enableHSTS: enableHSTS
+            )
+
+            if googleRoutesAPIKey == nil {
+                app.logger.warning("REDIS_URL is configured, but GOOGLE_ROUTES_API_KEY is missing. Route distance jobs will be skipped.")
+            }
+        } catch {
+            app.logger.error("Failed to configure Redis/queues: \(error.localizedDescription)")
+        }
+    } else {
+        app.logger.warning("REDIS_URL is not configured. Route distance jobs are disabled.")
     }
-    
+
     // Register migrations
     app.migrations.add(CreateUsersTableMigration())
     app.migrations.add(CreateRoutesTableMigration())
+    app.migrations.add(CreateProfilesTableMigration())
     app.migrations.add(AddDistanceToRoutes())
-    
+
     // Register controllers
-    try app.register(collection: UserController())
+    try app.register(
+        collection: UserController(
+            authRateLimiterMiddleware: AuthRateLimiterMiddleware(
+                store: app.authRateLimiterStore,
+                maxAttempts: authRateLimitMaxAttempts,
+                window: authRateLimitWindow,
+                blockDuration: authRateLimitBlockDuration
+            )
+        )
+    )
     try app.register(collection: RouteController())
-    
-    // JWT algorithms
-    // Add HMAC with SHA-256 signer.
-    
-    guard let jwtSecret = Environment.get("JWT_SECRET"),
-          let secretData = jwtSecret.data(using: .utf8) else {
-        fatalError("JWT_SECRET is missing or invalid")
+
+    await app.jwt.keys.add(hmac: .init(from: jwtSecretData), digestAlgorithm: .sha256)
+
+    try routes(app)
+
+    if autoMigrateOnStartup {
+        try await app.autoMigrate()
+    } else {
+        app.logger.notice("AUTO_MIGRATE is disabled. Skipping automatic migrations on startup.")
+    }
+}
+
+private func requireEnvironment(_ name: String) throws -> String {
+    guard let value = Environment.get(name)?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+        throw AppConfigurationError(message: "Missing required environment variable: \(name)")
     }
 
-    await app.jwt.keys.add(hmac: .init(from: secretData), digestAlgorithm: .sha256)
+    return value
+}
 
-    // register routes
-    try routes(app)
-    
-    
-    try await app.autoMigrate()
+private func data(for value: String, variableName: String) throws -> Data {
+    guard let data = value.data(using: .utf8), !data.isEmpty else {
+        throw AppConfigurationError(message: "\(variableName) is invalid")
+    }
+
+    return data
+}
+
+private func boolEnvironment(_ name: String) -> Bool? {
+    guard let raw = Environment.get(name)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else {
+        return nil
+    }
+
+    switch raw {
+    case "1", "true", "yes", "y", "on":
+        return true
+    case "0", "false", "no", "n", "off":
+        return false
+    default:
+        return nil
+    }
+}
+
+private func doubleEnvironment(_ name: String) -> Double? {
+    guard let raw = Environment.get(name)?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+        return nil
+    }
+
+    return Double(raw)
+}
+
+private func intEnvironment(_ name: String) -> Int? {
+    guard let raw = Environment.get(name)?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+        return nil
+    }
+
+    return Int(raw)
+}
+
+private func csvEnvironment(_ name: String) -> [String] {
+    guard let raw = Environment.get(name), !raw.isEmpty else {
+        return []
+    }
+
+    return raw
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+}
+
+private func redisConfiguration(from redisURL: String) throws -> RedisConfiguration {
+    let tlsConfiguration: TLSConfiguration? = redisURL.lowercased().hasPrefix("rediss://")
+        ? TLSConfiguration.makeClientConfiguration()
+        : nil
+
+    return try RedisConfiguration(url: redisURL, tlsConfiguration: tlsConfiguration)
+}
+
+private func configureMiddleware(_ app: Application) throws {
+    app.middleware.use(ErrorMiddleware.default(environment: app.environment))
+    app.middleware.use(SecurityHeadersMiddleware(enableHSTS: app.appConfiguration.enableHSTS))
+
+    if !app.appConfiguration.corsAllowedOrigins.isEmpty {
+        let allowedOrigins: CORSMiddleware.AllowOriginSetting
+        if app.appConfiguration.corsAllowedOrigins.contains("*") {
+            allowedOrigins = .all
+        } else {
+            allowedOrigins = .originBased
+        }
+
+        let configuration = CORSMiddleware.Configuration(
+            allowedOrigin: allowedOrigins,
+            allowedMethods: [.GET, .POST, .DELETE, .OPTIONS],
+            allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith],
+            allowCredentials: true
+        )
+        app.middleware.use(CORSMiddleware(configuration: configuration))
+    }
 }

@@ -1,32 +1,49 @@
 import Fluent
 import Vapor
-import Redis
+import FluentSQL
 
 func routes(_ app: Application) throws {
     app.get { req async in
         "It works!"
     }
-    
-    app.get("redis-test") { req async throws -> String in
-        
-        let value = req.redis.set("my_key2", to: "test")
-        
-        return "Done! \(value)"
+
+    app.get("health", "live") { _ async -> HealthStatusDTO in
+        HealthStatusDTO(status: "ok", checks: ["application": "ok"])
     }
-    
-    app.get("redis", ":key") { req async throws -> String in
-        guard let keyString = req.parameters.get("key") else {
-            throw Abort(.badRequest, reason: "Missing key parameter")
+
+    app.get("health", "ready") { req async throws -> Response in
+        var checks: [String: String] = [:]
+        var status: HTTPStatus = .ok
+
+        do {
+            if let sqlDatabase = req.db as? any SQLDatabase {
+                _ = try await sqlDatabase.raw("SELECT 1").all()
+            } else {
+                _ = try await User.query(on: req.db).limit(1).all()
+            }
+            checks["database"] = "ok"
+        } catch {
+            req.logger.error("Readiness database check failed: \(error.localizedDescription)")
+            checks["database"] = "error"
+            status = .serviceUnavailable
         }
 
-        let key = RedisKey(keyString) // <-- создаём RedisKey из строки
-
-        if let value = try await req.redis.get(key, as: String.self).get() {
-            return "value: \(value), for key: \(keyString)"
+        if req.application.appConfiguration.queueProcessingEnabled {
+            do {
+                _ = try await req.application.redis.ping().get()
+                checks["redis"] = "ok"
+            } catch {
+                req.logger.error("Readiness Redis check failed: \(error.localizedDescription)")
+                checks["redis"] = "error"
+                status = .serviceUnavailable
+            }
         } else {
-            return "no value found for key: \(keyString)"
+            checks["redis"] = "disabled"
         }
+
+        return try await HealthStatusDTO(
+            status: status == .ok ? "ok" : "degraded",
+            checks: checks
+        ).encodeResponse(status: status, for: req)
     }
-        
-  
 }

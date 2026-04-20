@@ -3,14 +3,20 @@ import Vapor
 import Fluent
 
 actor UserController: RouteCollection {
+    private let authRateLimiterMiddleware: AuthRateLimiterMiddleware
+
+    init(authRateLimiterMiddleware: AuthRateLimiterMiddleware) {
+        self.authRateLimiterMiddleware = authRateLimiterMiddleware
+    }
     
     nonisolated func boot(routes: any RoutesBuilder) throws {
         let api = routes.grouped("api")
+        let authProtected = api.grouped(authRateLimiterMiddleware)
         
         // /api/register
-        api.post("register", use: register)
+        authProtected.post("register", use: register)
         // /api/login
-        api.post("login", use: login)
+        authProtected.post("login", use: login)
     }
     
     func login(req: Request) async throws -> LoginResponseDTO {
@@ -22,7 +28,7 @@ actor UserController: RouteCollection {
         guard let existingUser = try await User.query(on: req.db)
             .filter(\.$username == user.username)
             .first() else {
-            return LoginResponseDTO(error: true, reason: "Username is not found!")
+            return LoginResponseDTO(error: true, reason: "Invalid username or password.")
             }
         
         // 3. Validate the password
@@ -30,11 +36,12 @@ actor UserController: RouteCollection {
         
         // 4. Check result
         if !result {
-            return LoginResponseDTO(error: true, reason: "Password is incorrect.")
+            return LoginResponseDTO(error: true, reason: "Invalid username or password.")
         }
         
         // 5. Generating the token
-        let authPayload = try AuthPayload(expiration: .init(value: .distantFuture), userId: existingUser.requireID().uuidString)
+        let expirationDate = Date().addingTimeInterval(req.application.appConfiguration.jwtAccessTokenLifetime)
+        let authPayload = try AuthPayload(expiration: .init(value: expirationDate), userId: existingUser.requireID().uuidString)
         
         // 6. Returning successful data to the client
         return try await LoginResponseDTO(error: false, token: req.jwt.sign(authPayload), userId: existingUser.requireID())

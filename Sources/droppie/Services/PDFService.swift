@@ -10,28 +10,33 @@ import Foundation
 
 final class PDFService: @unchecked Sendable {
     private let app: Application
-    private let binaryPath: String
+    private let binaryPath: String?
     
     init(app: Application) {
         self.app = app
-        
-        // Определяем путь к wkhtmltopdf под macOS и Linux
-#if os(macOS)
-        if FileManager.default.fileExists(atPath: "/opt/homebrew/bin/wkhtmltopdf") {
-            self.binaryPath = "/opt/homebrew/bin/wkhtmltopdf"
-        } else if FileManager.default.fileExists(atPath: "/usr/local/bin/wkhtmltopdf") {
-            self.binaryPath = "/usr/local/bin/wkhtmltopdf"
-        } else {
-            self.binaryPath = "/usr/bin/env" // fallback
+
+        if let configuredPath = Environment.get("WKHTMLTOPDF_PATH"), FileManager.default.isExecutableFile(atPath: configuredPath) {
+            self.binaryPath = configuredPath
+            return
         }
-#else
-        // Для Heroku (Linux)
-        self.binaryPath = "/app/vendor/wkhtmltopdf/bin/wkhtmltopdf"
-#endif
+
+        let candidatePaths: [String] = [
+            "/opt/homebrew/bin/wkhtmltopdf",
+            "/usr/local/bin/wkhtmltopdf",
+            "/usr/bin/wkhtmltopdf",
+            "/app/vendor/wkhtmltopdf/bin/wkhtmltopdf"
+        ]
+
+        self.binaryPath = candidatePaths.first(where: { FileManager.default.isExecutableFile(atPath: $0) })
     }
     
     /// Генерация PDF из HTML
     func generate(fromHTML html: String) async throws -> Data {
+        guard let binaryPath else {
+            app.logger.error("wkhtmltopdf binary is not configured or not executable.")
+            throw Abort(.serviceUnavailable, reason: "PDF generation is unavailable because wkhtmltopdf is not installed.")
+        }
+
         let tmpDir = FileManager.default.temporaryDirectory
         let htmlPath = tmpDir.appendingPathComponent(UUID().uuidString + ".html")
         let pdfPath = tmpDir.appendingPathComponent(UUID().uuidString + ".pdf")

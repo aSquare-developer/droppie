@@ -52,6 +52,11 @@ actor RouteController: RouteCollection {
     
     func generateRoutes(request: Request) async throws -> Response {
         // Пример запроса: /routes/generate?month=2&year=2025&currentOdometer=276743.0
+        let user = try request.auth.require(User.self)
+        guard let userID = user.id else {
+            throw Abort(.unauthorized)
+        }
+
         guard
             let month = request.query[Int.self, at: "month"],
             let year = request.query[Int.self, at: "year"],
@@ -59,28 +64,39 @@ actor RouteController: RouteCollection {
         else {
             throw Abort(.badRequest, reason: "Missing month or year")
         }
-        
-        let data = try await Route.fetchRoutes(forMonth: month, year: year, on: request.db)
+
+        let data = try await Route.fetchRoutes(for: userID, month: month, year: year, on: request.db)
         
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "dd.MM.yyyy"
 
+        let periodFormatter = DateFormatter()
+        periodFormatter.locale = Locale(identifier: "et_EE")
+        periodFormatter.dateFormat = "LLLL yyyy"
+
+        let periodDate = Calendar(identifier: .gregorian).date(from: DateComponents(year: year, month: month, day: 1))
+        let periodLabel = periodDate.map { periodFormatter.string(from: $0).capitalized } ?? "\(month).\(year)"
+
         var totalDistance = 0.0
         
         // Формируем данные для PDF
-        let routesForPDF: [RoutePDFModel] = data.map { route in
-            totalDistance += Double((route.distance ?? 0) / 1000)
+        let routesForPDF: [RoutePDFModel] = try data.map { route in
+            guard let distance = route.distance else {
+                throw Abort(.conflict, reason: "Cannot generate PDF while some routes are still missing distance values.")
+            }
+
+            totalDistance += Double(distance / 1000)
             
             let description = "\(route.origin) → \(route.destination) (Tellimuse kohaletoimetamine)"
             let start = currentOdometer
-            let end = start + Double((route.distance ?? 0) / 1000)
+            let end = start + Double(distance / 1000)
             
             let pdfRoute = RoutePDFModel(
                 date: dateFormatter.string(from: route.date),
                 description: description,
                 startOdometer: String(format: "%.1f", start),
                 endOdometer: String(format: "%.1f", end),
-                distance: String(format: "%.2f", route.distance! / 1000)
+                distance: String(format: "%.2f", distance / 1000)
             )
             
             currentOdometer = end
@@ -92,7 +108,7 @@ actor RouteController: RouteCollection {
             "companyName": "aSquare OÜ",
             "vehicleUser": "Artur Anissimov",
             "vehicleRegNumber": "981RFD",
-            "period": "Märts 2025",
+            "period": periodLabel,
             "routes": routesForPDF,
             "totalDistance": String(format: "%.2f", totalDistance)
         ]
@@ -150,12 +166,16 @@ actor RouteController: RouteCollection {
         let routeID = try route.requireID()
         
         // Redis section
-        try await req.queue.dispatch(RouteDistanceJob.self, routeID)
-        
-        // Return response to client
-        return RouteResponseDTO(error: false)
+        if req.application.appConfiguration.queueProcessingEnabled {
+            try await req.queue.dispatch(RouteDistanceJob.self, routeID)
+            return RouteResponseDTO(error: false)
+        }
+
+        req.logger.warning("Route \(routeID) saved without background distance processing because queue processing is disabled.")
+        return RouteResponseDTO(
+            error: false,
+            reason: "Route saved, but distance calculation is temporarily unavailable."
+        )
     }
     
 }
-
-

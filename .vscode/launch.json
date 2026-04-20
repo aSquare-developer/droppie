@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:droppie}",
+            "name": "Debug droppie",
+            "target": "droppie",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug droppie"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:droppie}",
+            "name": "Release droppie",
+            "target": "droppie",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release droppie"
+        }
+    ]
+}

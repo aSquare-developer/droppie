@@ -39,7 +39,12 @@ struct RouteDistanceJob: AsyncJob {
             
             // Try to Initializing a Google Service Object
             context.logger.info("ℹ️ Create connection with Google Routes API")
-            let googleService = GoogleRoutesService(client: context.application.client, apiKey: Constants.googleAPIKey)
+            guard let googleRoutesAPIKey = context.application.appConfiguration.googleRoutesAPIKey else {
+                context.logger.warning("Skipping route distance lookup because GOOGLE_ROUTES_API_KEY is missing.")
+                return
+            }
+
+            let googleService = GoogleRoutesService(client: context.application.client, apiKey: googleRoutesAPIKey)
             
             // Get Response from google service
             let googleResponse = try await googleService.getDirections(from: route.origin, to: route.destination)
@@ -61,8 +66,8 @@ struct RouteDistanceJob: AsyncJob {
                 try await route.save(on: db)
                 context.logger.info("✅ Route has been successfully updated!")
                 
-                let result = context.application.redis.set(key, to: String(distance))
-                context.logger.info("✅ Successfully added into Redis key: \(key) with value: \(distance), result: \(result)")
+                try await context.application.redis.set(key, to: String(distance)).get()
+                context.logger.info("✅ Successfully added into Redis key: \(key) with value: \(distance)")
                  
             } else {
                 context.logger.warning("⚠️ No route leg found in Google response")

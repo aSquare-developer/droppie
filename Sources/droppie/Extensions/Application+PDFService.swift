@@ -8,8 +8,28 @@
 import Vapor
 
 extension Application {
+    struct AppConfiguration: Sendable {
+        let googleRoutesAPIKey: String?
+        let queueProcessingEnabled: Bool
+        let autoMigrateOnStartup: Bool
+        let jwtAccessTokenLifetime: TimeInterval
+        let authRateLimitMaxAttempts: Int
+        let authRateLimitWindow: TimeInterval
+        let authRateLimitBlockDuration: TimeInterval
+        let corsAllowedOrigins: [String]
+        let enableHSTS: Bool
+    }
+
     private struct PDFServiceKey: StorageKey {
         typealias Value = PDFService
+    }
+
+    private struct AppConfigurationKey: StorageKey {
+        typealias Value = AppConfiguration
+    }
+
+    private struct AuthRateLimiterStoreKey: StorageKey {
+        typealias Value = AuthRateLimiterStore
     }
 
     var pdfService: PDFService {
@@ -26,5 +46,31 @@ extension Application {
             self.storage[PDFServiceKey.self] = newValue
         }
     }
-}
 
+    var appConfiguration: AppConfiguration {
+        get {
+            guard let configuration = self.storage[AppConfigurationKey.self] else {
+                fatalError("Application configuration accessed before setup")
+            }
+            return configuration
+        }
+        set {
+            self.storage[AppConfigurationKey.self] = newValue
+        }
+    }
+
+    var authRateLimiterStore: AuthRateLimiterStore {
+        get {
+            if let existing = self.storage[AuthRateLimiterStoreKey.self] {
+                return existing
+            }
+
+            let store = AuthRateLimiterStore()
+            self.storage[AuthRateLimiterStoreKey.self] = store
+            return store
+        }
+        set {
+            self.storage[AuthRateLimiterStoreKey.self] = newValue
+        }
+    }
+}
