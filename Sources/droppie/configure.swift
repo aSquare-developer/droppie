@@ -38,6 +38,10 @@ public func configure(_ app: Application) async throws {
     let emailFromName = Environment.get("EMAIL_FROM_NAME")?.trimmingCharacters(in: .whitespacesAndNewlines)
     let emailReplyToAddress = Environment.get("EMAIL_REPLY_TO_ADDRESS")?.trimmingCharacters(in: .whitespacesAndNewlines)
     let appBaseURL = Environment.get("APP_BASE_URL")?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let emailMaxRetryAttempts = max(intEnvironment("EMAIL_MAX_RETRY_ATTEMPTS") ?? 3, 1)
+    let emailRetryBaseDelaySeconds = max(doubleEnvironment("EMAIL_RETRY_BASE_DELAY_SECONDS") ?? 0.5, 0)
+    let emailVerificationResendCooldown = max(doubleEnvironment("EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS") ?? 60, 0)
+    let passwordResetRequestCooldown = max(doubleEnvironment("PASSWORD_RESET_REQUEST_COOLDOWN_SECONDS") ?? 60, 0)
 
     try validateEmailConfiguration(
         provider: emailProvider,
@@ -55,7 +59,9 @@ public func configure(_ app: Application) async throws {
         authRateLimitWindow: authRateLimitWindow,
         authRateLimitBlockDuration: authRateLimitBlockDuration,
         corsAllowedOrigins: corsAllowedOrigins,
-        enableHSTS: enableHSTS
+        enableHSTS: enableHSTS,
+        emailVerificationResendCooldown: emailVerificationResendCooldown,
+        passwordResetRequestCooldown: passwordResetRequestCooldown
     )
     app.emailConfiguration = .init(
         provider: emailProvider,
@@ -64,7 +70,9 @@ public func configure(_ app: Application) async throws {
         replyToEmail: emailReplyToAddress,
         apiBaseURL: emailAPIBaseURL,
         apiKey: emailAPIKey,
-        appBaseURL: appBaseURL
+        appBaseURL: appBaseURL,
+        maxRetryAttempts: emailMaxRetryAttempts,
+        retryBaseDelaySeconds: emailRetryBaseDelaySeconds
     )
 
     try configureMiddleware(app)
@@ -114,7 +122,9 @@ public func configure(_ app: Application) async throws {
                 authRateLimitWindow: authRateLimitWindow,
                 authRateLimitBlockDuration: authRateLimitBlockDuration,
                 corsAllowedOrigins: corsAllowedOrigins,
-                enableHSTS: enableHSTS
+                enableHSTS: enableHSTS,
+                emailVerificationResendCooldown: emailVerificationResendCooldown,
+                passwordResetRequestCooldown: passwordResetRequestCooldown
             )
 
             if googleRoutesAPIKey == nil {
@@ -130,6 +140,7 @@ public func configure(_ app: Application) async throws {
     // Register migrations
     app.migrations.add(CreateUsersTableMigration())
     app.migrations.add(AddEmailAuthFieldsToUsers())
+    app.migrations.add(AddEmailDeliveryAuditFieldsToUsers())
     app.migrations.add(CreateRoutesTableMigration())
     app.migrations.add(CreateProfilesTableMigration())
     app.migrations.add(AddDistanceToRoutes())

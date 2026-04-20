@@ -17,6 +17,20 @@ final class CapturingEmailService: EmailService, @unchecked Sendable {
     }
 }
 
+final class FailingEmailService: EmailService, @unchecked Sendable {
+    enum StubError: Error {
+        case providerRejected
+    }
+
+    override func sendVerificationEmail(to email: String, token: String) async throws {
+        throw StubError.providerRejected
+    }
+
+    override func sendPasswordResetEmail(to email: String, token: String) async throws {
+        throw StubError.providerRejected
+    }
+}
+
 final class AuthLifecycleTests: XCTestCase {
     var app: Application!
     var emailService: CapturingEmailService!
@@ -194,6 +208,88 @@ final class AuthLifecycleTests: XCTestCase {
             XCTAssertNotNil(body.accessToken)
             XCTAssertNotNil(body.refreshToken)
         }
+    }
+
+    func testEmailVerificationRequestCooldownPreventsImmediateResend() async throws {
+        let registerRequest = RegisterRequestDTO(
+            username: "cooldown_verify_user",
+            email: "cooldown_verify_user@example.com",
+            password: "StrongPass123"
+        )
+
+        let registerResponse = try await app.sendRequest(
+            .POST,
+            "/api/register",
+            headers: jsonHeaders,
+            body: try jsonBody(registerRequest)
+        )
+        XCTAssertEqual(registerResponse.status, .ok)
+
+        let firstToken = try XCTUnwrap(emailService.verificationTokensByEmail["cooldown_verify_user@example.com"])
+
+        let resendResponse = try await app.sendRequest(
+            .POST,
+            "/api/verify-email/request",
+            headers: jsonHeaders,
+            body: try jsonBody(EmailRequestDTO(email: "cooldown_verify_user@example.com"))
+        )
+        XCTAssertEqual(resendResponse.status, .ok)
+        XCTAssertContent(MessageResponseDTO.self, resendResponse) { body in
+            XCTAssertFalse(body.error)
+            XCTAssertEqual(body.message, "Verification email was sent recently. Please wait before requesting another one.")
+        }
+
+        XCTAssertEqual(emailService.verificationTokensByEmail["cooldown_verify_user@example.com"], firstToken)
+    }
+
+    func testPasswordResetCooldownPreventsImmediateRepeatRequest() async throws {
+        _ = try await registerAndVerify(
+            username: "cooldown_reset_user",
+            email: "cooldown_reset_user@example.com",
+            password: "StrongPass123"
+        )
+
+        let firstForgotResponse = try await app.sendRequest(
+            .POST,
+            "/api/forgot-password",
+            headers: jsonHeaders,
+            body: try jsonBody(EmailRequestDTO(email: "cooldown_reset_user@example.com"))
+        )
+        XCTAssertEqual(firstForgotResponse.status, .ok)
+
+        let firstToken = try XCTUnwrap(emailService.resetTokensByEmail["cooldown_reset_user@example.com"])
+
+        let secondForgotResponse = try await app.sendRequest(
+            .POST,
+            "/api/forgot-password",
+            headers: jsonHeaders,
+            body: try jsonBody(EmailRequestDTO(email: "cooldown_reset_user@example.com"))
+        )
+        XCTAssertEqual(secondForgotResponse.status, .ok)
+        XCTAssertContent(MessageResponseDTO.self, secondForgotResponse) { body in
+            XCTAssertFalse(body.error)
+            XCTAssertEqual(body.message, "Password reset email was sent recently. Please wait before requesting another one.")
+        }
+
+        XCTAssertEqual(emailService.resetTokensByEmail["cooldown_reset_user@example.com"], firstToken)
+    }
+
+    func testRegisterMasksSensitiveEmailDeliveryErrors() async throws {
+        app.emailService = FailingEmailService(app: app)
+
+        let response = try await app.sendRequest(
+            .POST,
+            "/api/register",
+            headers: jsonHeaders,
+            body: try jsonBody(RegisterRequestDTO(
+                username: "masked_error_user",
+                email: "masked_error_user@example.com",
+                password: "StrongPass123"
+            ))
+        )
+        XCTAssertEqual(response.status, .serviceUnavailable)
+        XCTAssertContains(response.body.string, "Unable to process email delivery at this time.")
+        XCTAssertFalse(response.body.string.contains("providerRejected"))
     }
 
     func testProfileUpsertAndGetFlow() async throws {

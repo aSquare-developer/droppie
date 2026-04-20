@@ -80,6 +80,7 @@ actor UserController: RouteCollection {
         let verificationToken = TokenService.generateToken()
         let verificationTokenHash = TokenService.hash(verificationToken)
         let verificationExpiresAt = Date().addingTimeInterval(60 * 60 * 24)
+        let verificationSentAt = Date()
 
         let user = User(
             username: registerRequest.username,
@@ -87,11 +88,17 @@ actor UserController: RouteCollection {
             password: try await req.password.async.hash(registerRequest.password),
             emailVerifiedAt: nil,
             emailVerificationTokenHash: verificationTokenHash,
-            emailVerificationTokenExpiresAt: verificationExpiresAt
+            emailVerificationTokenExpiresAt: verificationExpiresAt,
+            emailVerificationLastSentAt: verificationSentAt
         )
 
         try await user.save(on: req.db)
-        try await req.application.emailService.sendVerificationEmail(to: normalizedEmail, token: verificationToken)
+        do {
+            try await sendVerificationEmail(to: normalizedEmail, token: verificationToken, using: req)
+        } catch {
+            try? await user.delete(on: req.db)
+            throw error
+        }
         
         let authResponse = try await buildAuthResponse(for: user, on: req)
 
@@ -132,11 +139,34 @@ actor UserController: RouteCollection {
             .filter(\.$email == normalizedEmail)
             .first(),
            !user.isEmailVerified {
+            guard canResendVerification(for: user, on: req) else {
+                return MessageResponseDTO(
+                    error: false,
+                    message: "Verification email was sent recently. Please wait before requesting another one."
+                )
+            }
+
+            let previousTokenHash = user.emailVerificationTokenHash
+            let previousExpiresAt = user.emailVerificationTokenExpiresAt
+            let previousLastSentAt = user.emailVerificationLastSentAt
             let verificationToken = TokenService.generateToken()
             user.emailVerificationTokenHash = TokenService.hash(verificationToken)
             user.emailVerificationTokenExpiresAt = Date().addingTimeInterval(60 * 60 * 24)
+            user.emailVerificationLastSentAt = Date()
             try await user.save(on: req.db)
-            try await req.application.emailService.sendVerificationEmail(to: normalizedEmail, token: verificationToken)
+
+            do {
+                try await sendVerificationEmail(to: normalizedEmail, token: verificationToken, using: req)
+            } catch {
+                user.emailVerificationTokenHash = previousTokenHash
+                user.emailVerificationTokenExpiresAt = previousExpiresAt
+                user.emailVerificationLastSentAt = previousLastSentAt
+                try? await user.save(on: req.db)
+                return MessageResponseDTO(
+                    error: false,
+                    message: "If the email exists and is not verified, a verification email will be sent if delivery is available."
+                )
+            }
         }
 
         return MessageResponseDTO(
@@ -177,11 +207,34 @@ actor UserController: RouteCollection {
             .filter(\.$email == normalizedEmail)
             .first(),
            user.isEmailVerified {
+            guard canRequestPasswordReset(for: user, on: req) else {
+                return MessageResponseDTO(
+                    error: false,
+                    message: "Password reset email was sent recently. Please wait before requesting another one."
+                )
+            }
+
+            let previousTokenHash = user.passwordResetTokenHash
+            let previousExpiresAt = user.passwordResetTokenExpiresAt
+            let previousLastSentAt = user.passwordResetLastSentAt
             let resetToken = TokenService.generateToken()
             user.passwordResetTokenHash = TokenService.hash(resetToken)
             user.passwordResetTokenExpiresAt = Date().addingTimeInterval(60 * 30)
+            user.passwordResetLastSentAt = Date()
             try await user.save(on: req.db)
-            try await req.application.emailService.sendPasswordResetEmail(to: normalizedEmail, token: resetToken)
+
+            do {
+                try await sendPasswordResetEmail(to: normalizedEmail, token: resetToken, using: req)
+            } catch {
+                user.passwordResetTokenHash = previousTokenHash
+                user.passwordResetTokenExpiresAt = previousExpiresAt
+                user.passwordResetLastSentAt = previousLastSentAt
+                try? await user.save(on: req.db)
+                return MessageResponseDTO(
+                    error: false,
+                    message: "If the email exists and is eligible, a password reset email will be sent if delivery is available."
+                )
+            }
         }
 
         return MessageResponseDTO(
@@ -298,5 +351,41 @@ actor UserController: RouteCollection {
             emailVerified: user.isEmailVerified,
             expiresAt: accessExpirationDate
         )
+    }
+
+    private func canResendVerification(for user: User, on req: Request) -> Bool {
+        guard let lastSentAt = user.emailVerificationLastSentAt else {
+            return true
+        }
+
+        let cooldown = req.application.appConfiguration.emailVerificationResendCooldown
+        return cooldown <= 0 || Date().timeIntervalSince(lastSentAt) >= cooldown
+    }
+
+    private func canRequestPasswordReset(for user: User, on req: Request) -> Bool {
+        guard let lastSentAt = user.passwordResetLastSentAt else {
+            return true
+        }
+
+        let cooldown = req.application.appConfiguration.passwordResetRequestCooldown
+        return cooldown <= 0 || Date().timeIntervalSince(lastSentAt) >= cooldown
+    }
+
+    private func sendVerificationEmail(to email: String, token: String, using req: Request) async throws {
+        do {
+            try await req.application.emailService.sendVerificationEmail(to: email, token: token)
+        } catch {
+            req.logger.error("Verification email delivery failed for \(email): \(error.localizedDescription)")
+            throw Abort(.serviceUnavailable, reason: "Unable to process email delivery at this time.")
+        }
+    }
+
+    private func sendPasswordResetEmail(to email: String, token: String, using req: Request) async throws {
+        do {
+            try await req.application.emailService.sendPasswordResetEmail(to: email, token: token)
+        } catch {
+            req.logger.error("Password reset email delivery failed for \(email): \(error.localizedDescription)")
+            throw Abort(.serviceUnavailable, reason: "Unable to process email delivery at this time.")
+        }
     }
 }

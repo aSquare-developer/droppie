@@ -109,22 +109,44 @@ class EmailService: @unchecked Sendable {
             replyTo: app.emailConfiguration.replyToEmail
         )
         let endpoint = normalizedEmailAPIBaseURL().appending(path: "emails")
-        var headers = HTTPHeaders()
-        headers.add(name: .authorization, value: "Bearer \(apiKey)")
-        headers.add(name: .contentType, value: "application/json")
-        headers.add(name: .accept, value: "application/json")
+        let maxAttempts = max(app.emailConfiguration.maxRetryAttempts, 1)
 
-        let response = try await app.client.post(URI(string: endpoint.absoluteString), headers: headers) { request in
-            try request.content.encode(payload)
+        for attempt in 1...maxAttempts {
+            do {
+                let response = try await sendResendRequest(
+                    endpoint: endpoint,
+                    apiKey: apiKey,
+                    payload: payload
+                )
+
+                guard response.status == .ok || response.status == .accepted else {
+                    let responseBody = response.body.flatMap { buffer in
+                        String(buffer: buffer)
+                    } ?? "<empty>"
+
+                    if shouldRetry(status: response.status), attempt < maxAttempts {
+                        app.logger.warning("Resend email delivery attempt \(attempt) failed with retryable status \(response.status.code). Retrying.")
+                        try await backoff(afterAttempt: attempt)
+                        continue
+                    }
+
+                    app.logger.error("Resend email delivery failed with status \(response.status.code): \(responseBody)")
+                    throw Abort(.badGateway, reason: "Email delivery failed.")
+                }
+
+                return
+            } catch {
+                if attempt < maxAttempts, shouldRetry(error: error) {
+                    app.logger.warning("Resend email delivery attempt \(attempt) failed with a retryable error: \(error.localizedDescription)")
+                    try await backoff(afterAttempt: attempt)
+                    continue
+                }
+
+                throw error
+            }
         }
 
-        guard response.status == .ok || response.status == .accepted else {
-            let responseBody = response.body.flatMap { buffer in
-                String(buffer: buffer)
-            } ?? "<empty>"
-            app.logger.error("Resend email delivery failed with status \(response.status.code): \(responseBody)")
-            throw Abort(.badGateway, reason: "Email provider rejected the message.")
-        }
+        throw Abort(.badGateway, reason: "Email delivery failed.")
     }
 
     private func buildAppURL(path: String, token: String) -> String? {
@@ -153,6 +175,44 @@ class EmailService: @unchecked Sendable {
         }
 
         return url
+    }
+
+    private func sendResendRequest(
+        endpoint: URL,
+        apiKey: String,
+        payload: ResendEmailRequest
+    ) async throws -> ClientResponse {
+        var headers = HTTPHeaders()
+        headers.add(name: .authorization, value: "Bearer \(apiKey)")
+        headers.add(name: .contentType, value: "application/json")
+        headers.add(name: .accept, value: "application/json")
+
+        return try await app.client.post(URI(string: endpoint.absoluteString), headers: headers) { request in
+            try request.content.encode(payload)
+        }
+    }
+
+    private func shouldRetry(status: HTTPResponseStatus) -> Bool {
+        status == .tooManyRequests || status.code >= 500
+    }
+
+    private func shouldRetry(error: any Error) -> Bool {
+        if let abort = error as? Abort {
+            return abort.status == .tooManyRequests || abort.status.code >= 500
+        }
+
+        return true
+    }
+
+    private func backoff(afterAttempt attempt: Int) async throws {
+        let baseDelay = max(app.emailConfiguration.retryBaseDelaySeconds, 0)
+        guard baseDelay > 0 else {
+            return
+        }
+
+        let exponent = max(attempt - 1, 0)
+        let delaySeconds = baseDelay * pow(2, Double(exponent))
+        try await Task.sleep(for: .seconds(delaySeconds))
     }
 }
 

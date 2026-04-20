@@ -149,8 +149,13 @@ Optional email variables:
 - `EMAIL_REPLY_TO_ADDRESS`
 - `APP_BASE_URL`
 - `EMAIL_API_BASE_URL`
+- `EMAIL_MAX_RETRY_ATTEMPTS`
+- `EMAIL_RETRY_BASE_DELAY_SECONDS`
+- `EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS`
+- `PASSWORD_RESET_REQUEST_COOLDOWN_SECONDS`
 
 If `APP_BASE_URL` is configured, verification and reset emails also include clickable links with the token in the query string.
+Provider delivery now uses retry with exponential backoff for retryable failures, and resend/reset requests are protected by cooldown windows.
 
 ## Route Distance And PDF Notes
 

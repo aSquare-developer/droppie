@@ -16,6 +16,8 @@ extension Application {
         let apiBaseURL: String
         let apiKey: String?
         let appBaseURL: String?
+        let maxRetryAttempts: Int
+        let retryBaseDelaySeconds: TimeInterval
 
         enum EmailProvider: String, Sendable {
             case logger
@@ -34,6 +36,8 @@ extension Application {
         let authRateLimitBlockDuration: TimeInterval
         let corsAllowedOrigins: [String]
         let enableHSTS: Bool
+        let emailVerificationResendCooldown: TimeInterval
+        let passwordResetRequestCooldown: TimeInterval
     }
 
     private struct PDFServiceKey: StorageKey {

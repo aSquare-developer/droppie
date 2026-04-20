@@ -32,6 +32,12 @@ final class User: Model, @unchecked Sendable {
 
     @OptionalField(key: "password_reset_token_expires_at")
     var passwordResetTokenExpiresAt: Date?
+
+    @OptionalField(key: "email_verification_last_sent_at")
+    var emailVerificationLastSentAt: Date?
+
+    @OptionalField(key: "password_reset_last_sent_at")
+    var passwordResetLastSentAt: Date?
     
     @Timestamp(key: "created_at", on: .create)
     var createdAt: Date?
@@ -47,7 +53,9 @@ final class User: Model, @unchecked Sendable {
         emailVerificationTokenHash: String? = nil,
         emailVerificationTokenExpiresAt: Date? = nil,
         passwordResetTokenHash: String? = nil,
-        passwordResetTokenExpiresAt: Date? = nil
+        passwordResetTokenExpiresAt: Date? = nil,
+        emailVerificationLastSentAt: Date? = nil,
+        passwordResetLastSentAt: Date? = nil
     ) {
         self.id = id
         self.username = username
@@ -58,6 +66,8 @@ final class User: Model, @unchecked Sendable {
         self.emailVerificationTokenExpiresAt = emailVerificationTokenExpiresAt
         self.passwordResetTokenHash = passwordResetTokenHash
         self.passwordResetTokenExpiresAt = passwordResetTokenExpiresAt
+        self.emailVerificationLastSentAt = emailVerificationLastSentAt
+        self.passwordResetLastSentAt = passwordResetLastSentAt
     }
 }
 
