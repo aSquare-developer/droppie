@@ -161,3 +161,13 @@ Usage guide:
 - refresh tokens are stateless JWTs and are not yet stored/revoked server-side
 - there is still very little automated test coverage
 - PDF generation depends on a local/system binary
+
+## CI
+
+GitHub Actions CI is configured in [.github/workflows/ci.yml](/Users/arturanissimov/Desktop/vapor/droppie/.github/workflows/ci.yml).
+
+It runs on every `push` and `pull_request` and currently does:
+
+- `swift package resolve`
+- `swift build`
+- `swift test`

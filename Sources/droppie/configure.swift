@@ -1,6 +1,7 @@
 import Vapor
 import Fluent
 import FluentPostgresDriver
+import FluentSQLiteDriver
 import JWT
 import Redis
 import QueuesRedisDriver
@@ -19,7 +20,7 @@ struct AppConfigurationError: Error, LocalizedError {
 public func configure(_ app: Application) async throws {
     app.views.use(.leaf)
 
-    let jwtSecret = try requireEnvironment("JWT_SECRET")
+    let jwtSecret = try requireEnvironment("JWT_SECRET", allowTestingDefault: app.environment == .testing)
     let jwtSecretData = try data(for: jwtSecret, variableName: "JWT_SECRET")
     let googleRoutesAPIKey = Environment.get("GOOGLE_ROUTES_API_KEY")
     let jwtLifetime = max(doubleEnvironment("JWT_ACCESS_TOKEN_LIFETIME_SECONDS") ?? 86_400, 300)
@@ -46,7 +47,10 @@ public func configure(_ app: Application) async throws {
 
     try configureMiddleware(app)
 
-    if let databaseURL = Environment.get("DATABASE_URL") {
+    if app.environment == .testing {
+        app.databases.use(.sqlite(.memory), as: .sqlite)
+        app.databases.default(to: .sqlite)
+    } else if let databaseURL = Environment.get("DATABASE_URL") {
         do {
             let postgresConfig = try SQLPostgresConfiguration(url: databaseURL)
             app.databases.use(.postgres(configuration: postgresConfig), as: .psql)
@@ -132,7 +136,13 @@ public func configure(_ app: Application) async throws {
     }
 }
 
-private func requireEnvironment(_ name: String) throws -> String {
+private func requireEnvironment(_ name: String, allowTestingDefault: Bool = false) throws -> String {
+    if allowTestingDefault {
+        return Environment.get(name)?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? Environment.get(name)!.trimmingCharacters(in: .whitespacesAndNewlines)
+            : "test-secret"
+    }
+
     guard let value = Environment.get(name)?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
         throw AppConfigurationError(message: "Missing required environment variable: \(name)")
     }

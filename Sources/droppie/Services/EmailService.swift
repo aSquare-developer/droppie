@@ -1,6 +1,6 @@
 import Vapor
 
-final class EmailService: @unchecked Sendable {
+class EmailService: @unchecked Sendable {
     private let app: Application
 
     init(app: Application) {
