@@ -8,6 +8,21 @@
 import Vapor
 
 extension Application {
+    struct EmailConfiguration: Sendable {
+        let provider: EmailProvider
+        let fromEmail: String?
+        let fromName: String?
+        let replyToEmail: String?
+        let apiBaseURL: String
+        let apiKey: String?
+        let appBaseURL: String?
+
+        enum EmailProvider: String, Sendable {
+            case logger
+            case resend
+        }
+    }
+
     struct AppConfiguration: Sendable {
         let googleRoutesAPIKey: String?
         let queueProcessingEnabled: Bool
@@ -31,6 +46,10 @@ extension Application {
 
     private struct AppConfigurationKey: StorageKey {
         typealias Value = AppConfiguration
+    }
+
+    private struct EmailConfigurationKey: StorageKey {
+        typealias Value = EmailConfiguration
     }
 
     private struct AuthRateLimiterStoreKey: StorageKey {
@@ -76,6 +95,19 @@ extension Application {
         }
         set {
             self.storage[AppConfigurationKey.self] = newValue
+        }
+    }
+
+    var emailConfiguration: EmailConfiguration {
+        get {
+            guard let configuration = self.storage[EmailConfigurationKey.self] else {
+                fatalError("Email configuration accessed before setup")
+            }
+
+            return configuration
+        }
+        set {
+            self.storage[EmailConfigurationKey.self] = newValue
         }
     }
 

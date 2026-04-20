@@ -91,7 +91,7 @@ actor UserController: RouteCollection {
         )
 
         try await user.save(on: req.db)
-        req.application.emailService.sendVerificationEmail(to: normalizedEmail, token: verificationToken)
+        try await req.application.emailService.sendVerificationEmail(to: normalizedEmail, token: verificationToken)
         
         let authResponse = try await buildAuthResponse(for: user, on: req)
 
@@ -136,7 +136,7 @@ actor UserController: RouteCollection {
             user.emailVerificationTokenHash = TokenService.hash(verificationToken)
             user.emailVerificationTokenExpiresAt = Date().addingTimeInterval(60 * 60 * 24)
             try await user.save(on: req.db)
-            req.application.emailService.sendVerificationEmail(to: normalizedEmail, token: verificationToken)
+            try await req.application.emailService.sendVerificationEmail(to: normalizedEmail, token: verificationToken)
         }
 
         return MessageResponseDTO(
@@ -181,7 +181,7 @@ actor UserController: RouteCollection {
             user.passwordResetTokenHash = TokenService.hash(resetToken)
             user.passwordResetTokenExpiresAt = Date().addingTimeInterval(60 * 30)
             try await user.save(on: req.db)
-            req.application.emailService.sendPasswordResetEmail(to: normalizedEmail, token: resetToken)
+            try await req.application.emailService.sendPasswordResetEmail(to: normalizedEmail, token: resetToken)
         }
 
         return MessageResponseDTO(

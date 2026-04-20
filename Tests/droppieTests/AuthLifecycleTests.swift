@@ -8,11 +8,11 @@ final class CapturingEmailService: EmailService, @unchecked Sendable {
     private(set) var verificationTokensByEmail: [String: String] = [:]
     private(set) var resetTokensByEmail: [String: String] = [:]
 
-    override func sendVerificationEmail(to email: String, token: String) {
+    override func sendVerificationEmail(to email: String, token: String) async throws {
         verificationTokensByEmail[email] = token
     }
 
-    override func sendPasswordResetEmail(to email: String, token: String) {
+    override func sendPasswordResetEmail(to email: String, token: String) async throws {
         resetTokensByEmail[email] = token
     }
 }

@@ -31,6 +31,19 @@ public func configure(_ app: Application) async throws {
     let authRateLimitBlockDuration = max(doubleEnvironment("AUTH_RATE_LIMIT_BLOCK_DURATION_SECONDS") ?? 900, 1)
     let corsAllowedOrigins = csvEnvironment("CORS_ALLOWED_ORIGINS")
     let enableHSTS = boolEnvironment("ENABLE_HSTS") ?? (app.environment == .production)
+    let emailProvider = emailProviderEnvironment("EMAIL_PROVIDER") ?? .logger
+    let emailAPIBaseURL = Environment.get("EMAIL_API_BASE_URL")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "https://api.resend.com"
+    let emailAPIKey = Environment.get("EMAIL_API_KEY")?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let emailFromAddress = Environment.get("EMAIL_FROM_ADDRESS")?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let emailFromName = Environment.get("EMAIL_FROM_NAME")?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let emailReplyToAddress = Environment.get("EMAIL_REPLY_TO_ADDRESS")?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let appBaseURL = Environment.get("APP_BASE_URL")?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    try validateEmailConfiguration(
+        provider: emailProvider,
+        apiKey: emailAPIKey,
+        fromAddress: emailFromAddress
+    )
 
     app.appConfiguration = .init(
         googleRoutesAPIKey: googleRoutesAPIKey,
@@ -43,6 +56,15 @@ public func configure(_ app: Application) async throws {
         authRateLimitBlockDuration: authRateLimitBlockDuration,
         corsAllowedOrigins: corsAllowedOrigins,
         enableHSTS: enableHSTS
+    )
+    app.emailConfiguration = .init(
+        provider: emailProvider,
+        fromEmail: emailFromAddress,
+        fromName: emailFromName,
+        replyToEmail: emailReplyToAddress,
+        apiBaseURL: emailAPIBaseURL,
+        apiKey: emailAPIKey,
+        appBaseURL: appBaseURL
     )
 
     try configureMiddleware(app)
@@ -206,6 +228,33 @@ private func redisConfiguration(from redisURL: String) throws -> RedisConfigurat
         : nil
 
     return try RedisConfiguration(url: redisURL, tlsConfiguration: tlsConfiguration)
+}
+
+private func emailProviderEnvironment(_ name: String) -> Application.EmailConfiguration.EmailProvider? {
+    guard let raw = Environment.get(name)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+          !raw.isEmpty else {
+        return nil
+    }
+
+    return Application.EmailConfiguration.EmailProvider(rawValue: raw)
+}
+
+private func validateEmailConfiguration(
+    provider: Application.EmailConfiguration.EmailProvider,
+    apiKey: String?,
+    fromAddress: String?
+) throws {
+    switch provider {
+    case .logger:
+        return
+    case .resend:
+        guard let apiKey, !apiKey.isEmpty else {
+            throw AppConfigurationError(message: "EMAIL_API_KEY is required when EMAIL_PROVIDER=resend")
+        }
+        guard let fromAddress, !fromAddress.isEmpty else {
+            throw AppConfigurationError(message: "EMAIL_FROM_ADDRESS is required when EMAIL_PROVIDER=resend")
+        }
+    }
 }
 
 private func configureMiddleware(_ app: Application) throws {

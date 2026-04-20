@@ -119,14 +119,38 @@ docker compose down -v
 
 ## Email Verification And Password Reset
 
-In the current development setup, emails are not sent through a real provider.
+The project supports two email delivery modes:
 
-Instead:
+- `logger` mode for local development
+- `resend` mode for real email delivery
+
+### Local Development
+
+By default, the app uses logger mode.
+
+In that mode:
 
 - verification tokens are written to the application logs
 - password reset tokens are written to the application logs
 
-That means you can fully test the flow locally without integrating SMTP first.
+That means you can fully test the flow locally without integrating an email provider first.
+
+### Production Email Delivery
+
+To send real emails through Resend, configure:
+
+- `EMAIL_PROVIDER=resend`
+- `EMAIL_API_KEY`
+- `EMAIL_FROM_ADDRESS`
+
+Optional email variables:
+
+- `EMAIL_FROM_NAME`
+- `EMAIL_REPLY_TO_ADDRESS`
+- `APP_BASE_URL`
+- `EMAIL_API_BASE_URL`
+
+If `APP_BASE_URL` is configured, verification and reset emails also include clickable links with the token in the query string.
 
 ## Route Distance And PDF Notes
 
@@ -157,7 +181,6 @@ Usage guide:
 
 ## Current Limitations
 
-- email delivery is logger-based, not SMTP/provider-based
 - refresh tokens are stateless JWTs and are not yet stored/revoked server-side
 - there is still very little automated test coverage
 - PDF generation depends on a local/system binary
