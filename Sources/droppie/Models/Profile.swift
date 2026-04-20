@@ -39,3 +39,23 @@ final class Profile: Model, Content, @unchecked Sendable {
     
 }
 
+extension Profile {
+    func update(from dto: ProfileRequestDTO) {
+        self.carOwner = dto.carOwner
+        self.carModel = dto.carModel
+        self.carRegnumber = dto.carRegnumber
+        self.vehicleUser = dto.vehicleUser
+    }
+
+    func toResponseDTO() throws -> ProfileResponseDTO {
+        .init(
+            id: try self.requireID(),
+            userId: self.$user.id,
+            carOwner: self.carOwner,
+            carModel: self.carModel,
+            carRegnumber: self.carRegnumber,
+            vehicleUser: self.vehicleUser,
+            createdAt: self.createdAt
+        )
+    }
+}

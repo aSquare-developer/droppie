@@ -125,16 +125,20 @@ actor RouteController: RouteCollection {
             return Response(status: .ok, headers: headers, body: .init(data: pdfData))
     }
     
-    func index(req: Request) async throws -> [Route] {
+    func index(req: Request) async throws -> PaginatedRoutesResponseDTO {
         
         let user = try req.auth.require(User.self)
         
         guard let userId = user.id else {
             throw Abort(.unauthorized)
         }
+
+        let pagination = try req.query.decode(RoutePaginationQueryDTO.self)
+        let page = pagination.page ?? 1
+        let per = pagination.per ?? 20
         
         do {
-            let routes = try await Route.getAllRoutes(for: userId, on: req.db)
+            let routes = try await Route.getPaginatedRoutes(for: userId, page: page, per: per, on: req.db)
             return routes
         } catch {
             req.logger.error("Error fetching routes for user \(userId): \(error.localizedDescription)")

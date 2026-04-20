@@ -23,6 +23,7 @@ public func configure(_ app: Application) async throws {
     let jwtSecretData = try data(for: jwtSecret, variableName: "JWT_SECRET")
     let googleRoutesAPIKey = Environment.get("GOOGLE_ROUTES_API_KEY")
     let jwtLifetime = max(doubleEnvironment("JWT_ACCESS_TOKEN_LIFETIME_SECONDS") ?? 86_400, 300)
+    let jwtRefreshLifetime = max(doubleEnvironment("JWT_REFRESH_TOKEN_LIFETIME_SECONDS") ?? 2_592_000, jwtLifetime)
     let autoMigrateOnStartup = boolEnvironment("AUTO_MIGRATE") ?? false
     let authRateLimitMaxAttempts = max(intEnvironment("AUTH_RATE_LIMIT_MAX_ATTEMPTS") ?? 10, 1)
     let authRateLimitWindow = max(doubleEnvironment("AUTH_RATE_LIMIT_WINDOW_SECONDS") ?? 60, 1)
@@ -35,6 +36,7 @@ public func configure(_ app: Application) async throws {
         queueProcessingEnabled: false,
         autoMigrateOnStartup: autoMigrateOnStartup,
         jwtAccessTokenLifetime: jwtLifetime,
+        jwtRefreshTokenLifetime: jwtRefreshLifetime,
         authRateLimitMaxAttempts: authRateLimitMaxAttempts,
         authRateLimitWindow: authRateLimitWindow,
         authRateLimitBlockDuration: authRateLimitBlockDuration,
@@ -81,6 +83,7 @@ public func configure(_ app: Application) async throws {
                 queueProcessingEnabled: googleRoutesAPIKey != nil,
                 autoMigrateOnStartup: autoMigrateOnStartup,
                 jwtAccessTokenLifetime: jwtLifetime,
+                jwtRefreshTokenLifetime: jwtRefreshLifetime,
                 authRateLimitMaxAttempts: authRateLimitMaxAttempts,
                 authRateLimitWindow: authRateLimitWindow,
                 authRateLimitBlockDuration: authRateLimitBlockDuration,
@@ -100,6 +103,7 @@ public func configure(_ app: Application) async throws {
 
     // Register migrations
     app.migrations.add(CreateUsersTableMigration())
+    app.migrations.add(AddEmailAuthFieldsToUsers())
     app.migrations.add(CreateRoutesTableMigration())
     app.migrations.add(CreateProfilesTableMigration())
     app.migrations.add(AddDistanceToRoutes())

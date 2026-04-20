@@ -11,19 +11,53 @@ final class User: Model, @unchecked Sendable {
     
     @Field(key: "username")
     var username: String
+
+    @OptionalField(key: "email")
+    var email: String?
     
     @Field(key: "password")
     var password: String
+
+    @OptionalField(key: "email_verified_at")
+    var emailVerifiedAt: Date?
+
+    @OptionalField(key: "email_verification_token_hash")
+    var emailVerificationTokenHash: String?
+
+    @OptionalField(key: "email_verification_token_expires_at")
+    var emailVerificationTokenExpiresAt: Date?
+
+    @OptionalField(key: "password_reset_token_hash")
+    var passwordResetTokenHash: String?
+
+    @OptionalField(key: "password_reset_token_expires_at")
+    var passwordResetTokenExpiresAt: Date?
     
     @Timestamp(key: "created_at", on: .create)
     var createdAt: Date?
     
     init() {}
     
-    init(id: UUID? = nil, username: String, password: String) {
+    init(
+        id: UUID? = nil,
+        username: String,
+        email: String? = nil,
+        password: String,
+        emailVerifiedAt: Date? = nil,
+        emailVerificationTokenHash: String? = nil,
+        emailVerificationTokenExpiresAt: Date? = nil,
+        passwordResetTokenHash: String? = nil,
+        passwordResetTokenExpiresAt: Date? = nil
+    ) {
         self.id = id
         self.username = username
+        self.email = email
         self.password = password
+        self.emailVerifiedAt = emailVerifiedAt
+        self.emailVerificationTokenHash = emailVerificationTokenHash
+        self.emailVerificationTokenExpiresAt = emailVerificationTokenExpiresAt
+        self.passwordResetTokenHash = passwordResetTokenHash
+        self.passwordResetTokenExpiresAt = passwordResetTokenExpiresAt
     }
 }
 
@@ -32,6 +66,7 @@ extension User: Content { }
 extension User: Validatable {
     static func validations(_ validations: inout Validations) {
         validations.add("username", as: String.self, is: !.empty, customFailureDescription: "Username cannot be empty.")
+        validations.add("email", as: String.self, is: .email, customFailureDescription: "Email is invalid.")
         validations.add("password", as: String.self, is: !.empty, customFailureDescription: "Password cannot be empty.")
         
         validations.add(
@@ -44,3 +79,13 @@ extension User: Validatable {
 }
 
 extension User: Authenticatable { }
+
+extension User {
+    static func normalizeEmail(_ email: String) -> String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    var isEmailVerified: Bool {
+        self.emailVerifiedAt != nil
+    }
+}

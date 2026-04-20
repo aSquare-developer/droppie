@@ -22,7 +22,9 @@ let package = Package(
         // Queues Redis Driver
         .package(url: "https://github.com/vapor/queues-redis-driver.git", from: "1.0.0"),
         // Leaf
-        .package(url: "https://github.com/vapor/leaf.git", from: "4.0.0")
+        .package(url: "https://github.com/vapor/leaf.git", from: "4.0.0"),
+        // Crypto primitives for hashing one-time tokens
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0")
 
     ],
     targets: [
@@ -38,6 +40,7 @@ let package = Package(
                 .product(name: "Redis", package: "redis"),
                 .product(name: "QueuesRedisDriver", package: "queues-redis-driver"),
                 .product(name: "Leaf", package: "leaf"),
+                .product(name: "Crypto", package: "swift-crypto"),
             ],
             swiftSettings: swiftSettings
         ),

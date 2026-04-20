@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 
-struct RegisterResponseDTO: Content {
+struct AuthResponseDTO: Content {
     let error: Bool
     var reason: String? = nil
     var accessToken: String? = nil

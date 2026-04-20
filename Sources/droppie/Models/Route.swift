@@ -101,6 +101,35 @@ final class Route: Model, Content, @unchecked Sendable {
             .limit(20)
             .all()
     }
+
+    static func getPaginatedRoutes(
+        for userID: UUID,
+        page: Int,
+        per: Int,
+        on db: any Database
+    ) async throws -> PaginatedRoutesResponseDTO {
+        let safePage = max(page, 1)
+        let safePer = min(max(per, 1), 100)
+        let offset = (safePage - 1) * safePer
+
+        let baseQuery = Route.query(on: db)
+            .filter(\.$user.$id == userID)
+
+        let total = try await baseQuery.count()
+        let items = try await Route.query(on: db)
+            .filter(\.$user.$id == userID)
+            .sort(\.$createdAt, .descending)
+            .range(offset..<(offset + safePer))
+            .all()
+
+        return .init(
+            items: items,
+            page: safePage,
+            per: safePer,
+            total: total,
+            hasMore: offset + items.count < total
+        )
+    }
     
     // MARK: - Get Unique key from origin and destination
     static func generateRouteKey(from dto: Route) -> String {

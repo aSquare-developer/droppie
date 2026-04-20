@@ -13,6 +13,7 @@ extension Application {
         let queueProcessingEnabled: Bool
         let autoMigrateOnStartup: Bool
         let jwtAccessTokenLifetime: TimeInterval
+        let jwtRefreshTokenLifetime: TimeInterval
         let authRateLimitMaxAttempts: Int
         let authRateLimitWindow: TimeInterval
         let authRateLimitBlockDuration: TimeInterval
@@ -22,6 +23,10 @@ extension Application {
 
     private struct PDFServiceKey: StorageKey {
         typealias Value = PDFService
+    }
+
+    private struct EmailServiceKey: StorageKey {
+        typealias Value = EmailService
     }
 
     private struct AppConfigurationKey: StorageKey {
@@ -44,6 +49,21 @@ extension Application {
         }
         set {
             self.storage[PDFServiceKey.self] = newValue
+        }
+    }
+
+    var emailService: EmailService {
+        get {
+            if let existing = self.storage[EmailServiceKey.self] {
+                return existing
+            } else {
+                let new = EmailService(app: self)
+                self.storage[EmailServiceKey.self] = new
+                return new
+            }
+        }
+        set {
+            self.storage[EmailServiceKey.self] = newValue
         }
     }
 
